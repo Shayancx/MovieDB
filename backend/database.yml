@@ -1,0 +1,11 @@
+# Database configuration for MovieDB
+# Save this as database.yml in the same directory as the import script
+
+host: localhost
+port: 5432
+dbname: MovieDB
+user: shayan  # Change to your PostgreSQL username
+password: ""  # Add your password if needed
+
+# You can also use environment variables:
+# password: <%= ENV['DB_PASSWORD'] %>
