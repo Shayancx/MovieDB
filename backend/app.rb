@@ -31,12 +31,16 @@ class MovieExplorer < Roda
   plugin :all_verbs
   plugin :halt
   plugin :public, root: '../WebUI'
+  # --- FIX: Serve the media directory ---
+  # This makes files in the top-level 'media' folder accessible under the /media/ URL path.
+  plugin :public, root: '../../media', prefix: 'media'
 
   plugin :not_found do
     if request.path.start_with?('/api/')
       response.status = 404
       { error: 'API route not found' }
     else
+      # For any other path, serve the main index.html to let the frontend handle routing.
       File.read('../WebUI/index.html')
     end
   end
@@ -55,8 +59,10 @@ class MovieExplorer < Roda
     'Content-Type' => 'application/json'
 
   route do |r|
+    # This serves static files from the configured public directories (WebUI and media)
     r.public
 
+    # Handle CORS preflight requests
     r.on method: :options do
       response.status = 204
       ""
@@ -75,7 +81,8 @@ class MovieExplorer < Roda
           SELECT 
             m.movie_id, m.movie_name, m.original_title, m.release_date,
             m.runtime_minutes, m.rating, m.franchise_id,
-            CONCAT('../media/movies/', m.movie_id, '/', m.poster_path) AS poster_path,
+            -- FIX: Removed '../' to create a correct server-relative path
+            CONCAT('media/movies/', m.movie_id, '/', m.poster_path) AS poster_path,
             f.franchise_name,
             COALESCE(ARRAY_AGG(DISTINCT g.genre_name) FILTER (WHERE g.genre_name IS NOT NULL), '{}') AS genres,
             COALESCE(ARRAY_AGG(DISTINCT c.country_name) FILTER (WHERE c.country_name IS NOT NULL), '{}') AS countries,
@@ -100,7 +107,9 @@ class MovieExplorer < Roda
           SELECT 
             m.movie_id, m.movie_name, m.original_title, m.release_date,
             m.runtime_minutes, m.rating, m.description,
-            CONCAT('../media/movies/', m.movie_id, '/', m.poster_path) AS poster_path,
+            -- FIX: Removed '../' to create a correct server-relative path
+            CONCAT('media/movies/', m.movie_id, '/', m.poster_path) AS poster_path,
+            CONCAT('media/movies/', m.movie_id, '/', m.backdrop_path) AS backdrop_path,
             f.franchise_name,
             COALESCE(ARRAY_AGG(DISTINCT g.genre_name) FILTER (WHERE g.genre_name IS NOT NULL), '{}') AS genres,
             COALESCE(ARRAY_AGG(DISTINCT c.country_name) FILTER (WHERE c.country_name IS NOT NULL), '{}') AS countries,
@@ -136,6 +145,7 @@ class MovieExplorer < Roda
           .where(Sequel[:movie_cast][:movie_id] => movie_id)
           .order(:billing_order)
           .select(:cast_id, Sequel[:people][:person_id], :full_name, :character_name, :billing_order, :role_name,
+                  # This path was already correct, no change needed here.
                   Sequel.function(:CONCAT, 'media/people/', Sequel[:people][:person_id], '/', Sequel[:people][:headshot_path]).as(:headshot_path))
           .all
         
@@ -187,7 +197,8 @@ class MovieExplorer < Roda
         r.halt(404, { error: 'Person not found' }) unless person
 
         if person[:headshot_path]
-          person[:headshot_path] = "../media/people/#{person[:person_id]}/#{person[:headshot_path]}"
+          # FIX: Removed '../' to create a correct server-relative path
+          person[:headshot_path] = "media/people/#{person[:person_id]}/#{person[:headshot_path]}"
         end
 
         person[:movies] = DB[:movie_cast]
@@ -195,7 +206,8 @@ class MovieExplorer < Roda
           .where(Sequel[:movie_cast][:person_id] => person_id)
           .order(Sequel.desc(:release_date))
           .select(Sequel[:movies][:movie_id], :movie_name, :release_date, :character_name,
-                  Sequel.function(:CONCAT, '../media/movies/', Sequel[:movies][:movie_id], '/', Sequel[:movies][:poster_path]).as(:poster_path))
+                  # FIX: Removed '../' to create a correct server-relative path
+                  Sequel.function(:CONCAT, 'media/movies/', Sequel[:movies][:movie_id], '/', Sequel[:movies][:poster_path]).as(:poster_path))
           .all
         person
       end
