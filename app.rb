@@ -14,6 +14,7 @@ begin
     user: ENV['DB_USER'] || 'shayan',
     password: ENV['DB_PASSWORD'] || ''
   )
+  DB.extension :pg_array
   DB.test_connection
 rescue Sequel::DatabaseConnectionError => e
   puts "=" * 80, "DATABASE CONNECTION FAILED", "=" * 80
@@ -30,18 +31,18 @@ class MovieExplorer < Roda
   plugin :json
   plugin :all_verbs
   plugin :halt
-  plugin :public, root: '../WebUI'
-  # --- FIX: Serve the media directory ---
-  # This makes files in the top-level 'media' folder accessible under the /media/ URL path.
-  plugin :public, root: '../../media', prefix: 'media'
-
+  
+  
+  
   plugin :not_found do
     if request.path.start_with?('/api/')
       response.status = 404
+      response['Content-Type'] = 'application/json'
       { error: 'API route not found' }
     else
       # For any other path, serve the main index.html to let the frontend handle routing.
-      File.read('../WebUI/index.html')
+      response['Content-Type'] = 'text/html'
+      File.read('index.html')
     end
   end
   
@@ -49,20 +50,16 @@ class MovieExplorer < Roda
     warn "Error: #{e.message}"
     warn e.backtrace.join("\n")
     response.status = 500
+    response['Content-Type'] = 'application/json'
     { error: 'Internal server error' }
   end
 
   plugin :default_headers,
     'Access-Control-Allow-Origin' => '*',
     'Access-Control-Allow-Methods' => 'GET, POST, PUT, DELETE, OPTIONS',
-    'Access-Control-Allow-Headers' => 'Content-Type, Authorization',
-    'Content-Type' => 'application/json'
+    'Access-Control-Allow-Headers' => 'Content-Type, Authorization'
 
   route do |r|
-    # This serves static files from the configured public directories (WebUI and media)
-    r.public
-
-    # Handle CORS preflight requests
     r.on method: :options do
       response.status = 204
       ""
@@ -70,19 +67,18 @@ class MovieExplorer < Roda
 
     r.root do
       response['Content-Type'] = 'text/html'
-      File.read('../WebUI/index.html')
+      File.read('index.html')
     end
 
-    # --- API Routes ---
     r.on 'api' do
-      # /api/movies
+      response['Content-Type'] = 'application/json'
+      
       r.get 'movies' do
         DB.fetch(<<-SQL
           SELECT 
             m.movie_id, m.movie_name, m.original_title, m.release_date,
-            m.runtime_minutes, m.rating, m.franchise_id,
-            -- FIX: Removed '../' to create a correct server-relative path
-            CONCAT('media/movies/', m.movie_id, '/', m.poster_path) AS poster_path,
+            m.runtime_minutes, m.rating, m.franchise_id, m.poster_path,
+            m.imdb_id, m.tmdb_id,
             f.franchise_name,
             COALESCE(ARRAY_AGG(DISTINCT g.genre_name) FILTER (WHERE g.genre_name IS NOT NULL), '{}') AS genres,
             COALESCE(ARRAY_AGG(DISTINCT c.country_name) FILTER (WHERE c.country_name IS NOT NULL), '{}') AS countries,
@@ -101,15 +97,12 @@ class MovieExplorer < Roda
         ).all
       end
 
-      # /api/movie/:movie_id
       r.get 'movie', Integer do |movie_id|
         movie = DB.fetch(<<-SQL, movie_id).first
           SELECT 
             m.movie_id, m.movie_name, m.original_title, m.release_date,
             m.runtime_minutes, m.rating, m.description,
-            -- FIX: Removed '../' to create a correct server-relative path
-            CONCAT('media/movies/', m.movie_id, '/', m.poster_path) AS poster_path,
-            CONCAT('media/movies/', m.movie_id, '/', m.backdrop_path) AS backdrop_path,
+            m.poster_path, m.backdrop_path, m.imdb_id, m.tmdb_id,
             f.franchise_name,
             COALESCE(ARRAY_AGG(DISTINCT g.genre_name) FILTER (WHERE g.genre_name IS NOT NULL), '{}') AS genres,
             COALESCE(ARRAY_AGG(DISTINCT c.country_name) FILTER (WHERE c.country_name IS NOT NULL), '{}') AS countries,
@@ -128,6 +121,7 @@ class MovieExplorer < Roda
           WHERE m.movie_id = ?
           GROUP BY m.movie_id, f.franchise_name
         SQL
+
         r.halt(404, { error: 'Movie not found' }) unless movie
 
         movie[:directors] = DB[:movie_directors].join(:people, person_id: :person_id).where(Sequel[:movie_directors][:movie_id] => movie_id).select_map(:full_name)
@@ -144,9 +138,7 @@ class MovieExplorer < Roda
           .left_join(:role_types, role_type_id: Sequel[:movie_cast][:role_type_id])
           .where(Sequel[:movie_cast][:movie_id] => movie_id)
           .order(:billing_order)
-          .select(:cast_id, Sequel[:people][:person_id], :full_name, :character_name, :billing_order, :role_name,
-                  # This path was already correct, no change needed here.
-                  Sequel.function(:CONCAT, 'media/people/', Sequel[:people][:person_id], '/', Sequel[:people][:headshot_path]).as(:headshot_path))
+          .select(:cast_id, Sequel[:people][:person_id], :full_name, :character_name, :billing_order, :role_name, :headshot_path)
           .all
         
         files = DB[:movie_files]
@@ -196,20 +188,40 @@ class MovieExplorer < Roda
         person = DB[:people].where(person_id: person_id).first
         r.halt(404, { error: 'Person not found' }) unless person
 
-        if person[:headshot_path]
-          # FIX: Removed '../' to create a correct server-relative path
-          person[:headshot_path] = "media/people/#{person[:person_id]}/#{person[:headshot_path]}"
-        end
-
         person[:movies] = DB[:movie_cast]
           .join(:movies, movie_id: :movie_id)
           .where(Sequel[:movie_cast][:person_id] => person_id)
           .order(Sequel.desc(:release_date))
-          .select(Sequel[:movies][:movie_id], :movie_name, :release_date, :character_name,
-                  # FIX: Removed '../' to create a correct server-relative path
-                  Sequel.function(:CONCAT, 'media/movies/', Sequel[:movies][:movie_id], '/', Sequel[:movies][:poster_path]).as(:poster_path))
+          .select(Sequel[:movies][:movie_id], :movie_name, :release_date, :character_name, :poster_path)
           .all
         person
+      end
+
+      r.get 'statistics' do
+        total_movies = DB[:movies].count
+        total_size_mb = DB[:movie_files].sum(:file_size_mb)
+        total_runtime_minutes = DB[:movies].sum(:runtime_minutes)
+
+        movies_per_genre = DB[:movie_genres]
+          .join(:genres, genre_id: :genre_id)
+          .group_and_count(:genre_name)
+          .order(Sequel.desc(:count))
+          .limit(10)
+          .all
+
+        movies_per_year = DB[:movies]
+          .where{release_date !~ nil}
+          .group_and_count(Sequel.extract(:year, :release_date))
+          .order(Sequel.desc(Sequel.extract(:year, :release_date)))
+          .all
+
+        {
+          total_movies: total_movies,
+          total_size_gb: total_size_mb ? (total_size_mb / 1024.0).round(2) : 0,
+          total_runtime_hours: total_runtime_minutes ? (total_runtime_minutes / 60.0).round : 0,
+          movies_per_genre: movies_per_genre,
+          movies_per_year: movies_per_year
+        }
       end
     end
   end

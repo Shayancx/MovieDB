@@ -1,2 +1,4 @@
-backend/vendor/
 media/
+video.js/
+vendor/
+Gemfile.lock

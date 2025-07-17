@@ -1,4 +1,3 @@
-<!DOCTYPE html>
 <html lang="en" x-data="{
     isDark: localStorage.getItem('isDark') === 'true',
     movies: [],
@@ -23,6 +22,8 @@
     currentPage: 1,
     moviesPerPage: 24,
     showFilters: false,
+    statistics: null,
+    currentView: 'movies',
     
     init() {
         this.isDark = localStorage.getItem('isDark') === 'true' || false;
@@ -33,14 +34,16 @@
             fetch('/api/genres').then(res => res.json()),
             fetch('/api/countries').then(res => res.json()),
             fetch('/api/languages').then(res => res.json()),
-            fetch('/api/franchises').then(res => res.json())
-        ]).then(([movies, genres, countries, languages, franchises]) => {
+            fetch('/api/franchises').then(res => res.json()),
+            fetch('/api/statistics').then(res => res.json())
+        ]).then(([movies, genres, countries, languages, franchises, statistics]) => {
             this.allMovies = movies;
             this.movies = movies;
             this.genres = genres;
             this.countries = countries;
             this.languages = languages;
             this.franchises = franchises;
+            this.statistics = statistics;
             this.isLoading = false;
             
             // Initial routing call once data is loaded
@@ -281,7 +284,7 @@
             path = item.headshot_path;
             if (!path) return 'https://placehold.co/200x300/0a0a0a/1a1a1a?text=NO+PHOTO';
             // The path from DB is already 'people/123.jpg'
-            return `../media/${path}`;
+            return `/media/${path}`;
         }
 
         // Movie images
@@ -302,7 +305,7 @@
                 : 'https://placehold.co/1280x720/0a0a0a/1a1a1a?text=NO+BACKDROP';
         }
         // The path from DB is already 'movies/123/poster.jpg'
-        return `../media/${path}`;
+        return `/media/${path}`;
     },
     
     formatDate(dateString) {
@@ -378,6 +381,10 @@
                         </span>
                     </div>
                     
+                    <button @click="currentView = (currentView === 'movies' ? 'statistics' : 'movies')" class="theme-toggle">
+                        <span x-show="currentView === 'movies'">[STATISTICS]</span>
+                        <span x-show="currentView === 'statistics'">[MOVIE_LIST]</span>
+                    </button>
                     <button @click="isDark = !isDark" class="theme-toggle">
                         <span x-show="!isDark">[DARK_MODE]</span>
                         <span x-show="isDark">[LIGHT_MODE]</span>
@@ -446,17 +453,19 @@
                                     <img :src="getImageUrl(selectedMovie, 'poster')" 
                                          @error="$event.target.src='https://placehold.co/500x750/0a0a0a/1a1a1a?text=NO+POSTER'"
                                          :alt="selectedMovie?.movie_name">
-                                    <div class="poster-overlay">
-                                        <div class="rating-badge" x-show="selectedMovie?.rating">
-                                            <span class="rating-value" x-text="selectedMovie?.rating"></span>
-                                            <span class="rating-max">/10</span>
-                                        </div>
-                                    </div>
                                 </div>
                                 
                                 <div class="movie-info">
-                                    <div class="info-section">
-                                        <h3 class="section-title">&gt;&gt; SYNOPSIS</h3>
+                                    <div class="info-section-box" x-show="selectedMovie?.rating">
+                                        <h3 class="section-title">&gt;&gt; RATING</h3>
+                                        <div class="rating-display">
+                                            <span class="rating-value" x-text="selectedMovie?.rating ? Number(selectedMovie.rating).toFixed(1) : 'N/A'"></span>
+                                            <span class="rating-max">/ 10</span>
+                                        </div>
+                                    </div>
+
+                                    <div class="info-section-box">
+                                        <h3 class="section-title">&gt;&gt; DESCRIPTION</h3>
                                         <p class="description" x-text="selectedMovie?.description || 'No description available.'"></p>
                                     </div>
                                     
@@ -483,7 +492,7 @@
                                         <h3 class="section-title">&gt;&gt; GENRES</h3>
                                         <div class="tag-list">
                                             <template x-for="genre in selectedMovie?.genres" :key="genre">
-                                                <a :href="`#/genre/${encodeURIComponent(genre)}`" class="tag" x-text="`[${genre}]`"></a>
+                                                <a :href="`#/genre/${encodeURIComponent(genre)}`" class="tag" x-text="genre"></a>
                                             </template>
                                         </div>
                                     </div>
@@ -492,7 +501,7 @@
                                         <h3 class="section-title">&gt;&gt; LANGUAGES</h3>
                                         <div class="tag-list">
                                             <template x-for="lang in selectedMovie?.languages" :key="lang">
-                                                <a :href="`#/language/${encodeURIComponent(lang)}`" class="tag" x-text="`[${lang}]`"></a>
+                                                <a :href="`#/language/${encodeURIComponent(lang)}`" class="tag" x-text="lang"></a>
                                             </template>
                                         </div>
                                     </div>
@@ -501,7 +510,7 @@
                                         <h3 class="section-title">&gt;&gt; COUNTRIES</h3>
                                         <div class="tag-list">
                                             <template x-for="country in selectedMovie?.countries" :key="country">
-                                                <a :href="`#/country/${encodeURIComponent(country)}`" class="tag" x-text="`[${country}]`"></a>
+                                                <a :href="`#/country/${encodeURIComponent(country)}`" class="tag" x-text="country"></a>
                                             </template>
                                         </div>
                                     </div>
@@ -512,11 +521,11 @@
                                             <a x-show="selectedMovie?.imdb_id" 
                                                :href="`https://www.imdb.com/title/${selectedMovie?.imdb_id}`" 
                                                target="_blank" 
-                                               class="external-link">[IMDB]</a>
+                                               class="external-link">IMDB</a>
                                             <a x-show="selectedMovie?.tmdb_id" 
                                                :href="`https://www.themoviedb.org/movie/${selectedMovie?.tmdb_id}`" 
                                                target="_blank" 
-                                               class="external-link">[TMDB]</a>
+                                               class="external-link">TMDB</a>
                                         </div>
                                     </div>
                                 </div>
@@ -715,195 +724,240 @@
         </div>
 
         <main x-show="!selectedMovie">
-            <div class="controls-section">
-                <div class="search-bar">
-                    <span class="search-icon">&gt;</span>
-                    <input type="text" 
-                           x-model="searchQuery" 
-                           @input.debounce.300ms="filterAndSortMovies()"
-                           placeholder="SEARCH_MOVIES..."
-                           class="search-input">
+            <div x-show="currentView === 'movies'">
+                <div class="controls-section">
+                    <div class="search-bar">
+                        <span class="search-icon">&gt;</span>
+                        <input type="text" 
+                               x-model="searchQuery" 
+                               @input.debounce.300ms="filterAndSortMovies()"
+                               placeholder="SEARCH_MOVIES..."
+                               class="search-input">
+                    </div>
+                    
+                    <div class="control-buttons">
+                        <button @click="showFilters = !showFilters" 
+                                :class="{ 'active': showFilters }"
+                                class="control-btn">
+                            <span x-text="showFilters ? '[HIDE_FILTERS]' : '[SHOW_FILTERS]'"></span>
+                        </button>
+                        
+                        <div class="view-toggle">
+                            <button @click="viewMode = 'grid'" 
+                                    :class="{ 'active': viewMode === 'grid' }"
+                                    class="view-btn">[GRID]</button>
+                            <button @click="viewMode = 'list'" 
+                                    :class="{ 'active': viewMode === 'list' }"
+                                    class="view-btn">[LIST]</button>
+                        </div>
+                    </div>
                 </div>
                 
-                <div class="control-buttons">
-                    <button @click="showFilters = !showFilters" 
-                            :class="{ 'active': showFilters }"
-                            class="control-btn">
-                        <span x-text="showFilters ? '[HIDE_FILTERS]' : '[SHOW_FILTERS]'"></span>
-                    </button>
+                <div x-show="showFilters" 
+                     x-transition:enter="transition ease-out duration-300"
+                     x-transition:enter-start="opacity-0 -translate-y-2"
+                     x-transition:enter-end="opacity-100 translate-y-0"
+                     x-transition:leave="transition ease-in duration-200"
+                     x-transition:leave-start="opacity-100 translate-y-0"
+                     x-transition:leave-end="opacity-0 -translate-y-2"
+                     class="filters-panel">
                     
-                    <div class="view-toggle">
-                        <button @click="viewMode = 'grid'" 
-                                :class="{ 'active': viewMode === 'grid' }"
-                                class="view-btn">[GRID]</button>
-                        <button @click="viewMode = 'list'" 
-                                :class="{ 'active': viewMode === 'list' }"
-                                class="view-btn">[LIST]</button>
+                    <div class="filters-grid">
+                        <div class="filter-group">
+                            <label class="filter-label">GENRE:</label>
+                            <select x-model="selectedGenre" @change="filterAndSortMovies()" class="filter-select">
+                                <option value="">ALL_GENRES</option>
+                                <template x-for="genre in genres" :key="genre.genre_id">
+                                    <option :value="genre.genre_name" x-text="genre.genre_name"></option>
+                                </template>
+                            </select>
+                        </div>
+                        
+                        <div class="filter-group">
+                            <label class="filter-label">YEAR:</label>
+                            <select x-model="selectedYear" @change="filterAndSortMovies()" class="filter-select">
+                                <option value="">ALL_YEARS</option>
+                                <template x-for="year in years" :key="year">
+                                    <option :value="year" x-text="year"></option>
+                                </template>
+                            </select>
+                        </div>
+                        
+                        <div class="filter-group">
+                            <label class="filter-label">COUNTRY:</label>
+                            <select x-model="selectedCountry" @change="filterAndSortMovies()" class="filter-select">
+                                <option value="">ALL_COUNTRIES</option>
+                                <template x-for="country in countries" :key="country.country_id">
+                                    <option :value="country.country_name" x-text="country.country_name"></option>
+                                </template>
+                            </select>
+                        </div>
+                        
+                        <div class="filter-group">
+                            <label class="filter-label">LANGUAGE:</label>
+                            <select x-model="selectedLanguage" @change="filterAndSortMovies()" class="filter-select">
+                                <option value="">ALL_LANGUAGES</option>
+                                <template x-for="language in languages" :key="language.language_id">
+                                    <option :value="language.language_name" x-text="language.language_name"></option>
+                                </template>
+                            </select>
+                        </div>
+                        
+                        <div class="filter-group">
+                            <label class="filter-label">FRANCHISE:</label>
+                            <select x-model="selectedFranchise" @change="filterAndSortMovies()" class="filter-select">
+                                <option value="">ALL_FRANCHISES</option>
+                                <template x-for="franchise in franchises" :key="franchise.franchise_id">
+                                    <option :value="franchise.franchise_id" x-text="franchise.franchise_name"></option>
+                                </template>
+                            </select>
+                        </div>
+                        
+                        <div class="filter-group">
+                            <label class="filter-label">SORT_BY:</label>
+                            <select x-model="sortBy" @change="filterAndSortMovies()" class="filter-select">
+                                <option value="name">NAME</option>
+                                <option value="date">RELEASE_DATE</option>
+                                <option value="rating">RATING</option>
+                                <option value="runtime">RUNTIME</option>
+                            </select>
+                        </div>
+                        
+                        <div class="filter-group">
+                            <label class="filter-label">ORDER:</label>
+                            <select x-model="sortOrder" @change="filterAndSortMovies()" class="filter-select">
+                                <option value="asc">ASCENDING</option>
+                                <option value="desc">DESCENDING</option>
+                            </select>
+                        </div>
+                        
+                        <div class="filter-group">
+                            <button @click="clearFilters()" class="clear-filters-btn">[CLEAR_ALL]</button>
+                        </div>
                     </div>
                 </div>
-            </div>
-            
-            <div x-show="showFilters" 
-                 x-transition:enter="transition ease-out duration-300"
-                 x-transition:enter-start="opacity-0 -translate-y-2"
-                 x-transition:enter-end="opacity-100 translate-y-0"
-                 x-transition:leave="transition ease-in duration-200"
-                 x-transition:leave-start="opacity-100 translate-y-0"
-                 x-transition:leave-end="opacity-0 -translate-y-2"
-                 class="filters-panel">
                 
-                <div class="filters-grid">
-                    <div class="filter-group">
-                        <label class="filter-label">GENRE:</label>
-                        <select x-model="selectedGenre" @change="filterAndSortMovies()" class="filter-select">
-                            <option value="">ALL_GENRES</option>
-                            <template x-for="genre in genres" :key="genre.genre_id">
-                                <option :value="genre.genre_name" x-text="genre.genre_name"></option>
-                            </template>
-                        </select>
-                    </div>
-                    
-                    <div class="filter-group">
-                        <label class="filter-label">YEAR:</label>
-                        <select x-model="selectedYear" @change="filterAndSortMovies()" class="filter-select">
-                            <option value="">ALL_YEARS</option>
-                            <template x-for="year in years" :key="year">
-                                <option :value="year" x-text="year"></option>
-                            </template>
-                        </select>
-                    </div>
-                    
-                    <div class="filter-group">
-                        <label class="filter-label">COUNTRY:</label>
-                        <select x-model="selectedCountry" @change="filterAndSortMovies()" class="filter-select">
-                            <option value="">ALL_COUNTRIES</option>
-                            <template x-for="country in countries" :key="country.country_id">
-                                <option :value="country.country_name" x-text="country.country_name"></option>
-                            </template>
-                        </select>
-                    </div>
-                    
-                    <div class="filter-group">
-                        <label class="filter-label">LANGUAGE:</label>
-                        <select x-model="selectedLanguage" @change="filterAndSortMovies()" class="filter-select">
-                            <option value="">ALL_LANGUAGES</option>
-                            <template x-for="language in languages" :key="language.language_id">
-                                <option :value="language.language_name" x-text="language.language_name"></option>
-                            </template>
-                        </select>
-                    </div>
-                    
-                    <div class="filter-group">
-                        <label class="filter-label">FRANCHISE:</label>
-                        <select x-model="selectedFranchise" @change="filterAndSortMovies()" class="filter-select">
-                            <option value="">ALL_FRANCHISES</option>
-                            <template x-for="franchise in franchises" :key="franchise.franchise_id">
-                                <option :value="franchise.franchise_id" x-text="franchise.franchise_name"></option>
-                            </template>
-                        </select>
-                    </div>
-                    
-                    <div class="filter-group">
-                        <label class="filter-label">SORT_BY:</label>
-                        <select x-model="sortBy" @change="filterAndSortMovies()" class="filter-select">
-                            <option value="name">NAME</option>
-                            <option value="date">RELEASE_DATE</option>
-                            <option value="rating">RATING</option>
-                            <option value="runtime">RUNTIME</option>
-                        </select>
-                    </div>
-                    
-                    <div class="filter-group">
-                        <label class="filter-label">ORDER:</label>
-                        <select x-model="sortOrder" @change="filterAndSortMovies()" class="filter-select">
-                            <option value="asc">ASCENDING</option>
-                            <option value="desc">DESCENDING</option>
-                        </select>
-                    </div>
-                    
-                    <div class="filter-group">
-                        <button @click="clearFilters()" class="clear-filters-btn">[CLEAR_ALL]</button>
-                    </div>
-                </div>
-            </div>
-            
-            <div x-show="viewMode === 'grid'" class="movies-grid">
-                <template x-for="movie in paginatedMovies" :key="movie.movie_id">
-                    <div @click="selectMovie(movie)" class="movie-card">
-                        <div class="movie-card-inner">
-                            <img :src="getImageUrl(movie, 'poster')" 
-                                 @error="$event.target.src='https://placehold.co/500x750/0a0a0a/1a1a1a?text=NO+POSTER'"
-                                 :alt="movie.movie_name"
-                                 class="movie-poster-img">
-                            <div class="movie-card-overlay">
-                                <div class="movie-card-info">
-                                    <h3 class="movie-card-title" x-text="movie.movie_name"></h3>
-                                    <p class="movie-card-year" x-text="movie.release_date ? new Date(movie.release_date).getFullYear() : 'N/A'"></p>
-                                    <div class="movie-card-rating" x-show="movie.rating">
-                                        <span x-text="movie.rating"></span>
-                                        <span class="rating-stars">★</span>
+                <div x-show="viewMode === 'grid'" class="movies-grid">
+                    <template x-for="movie in paginatedMovies" :key="movie.movie_id">
+                        <div @click="selectMovie(movie)" class="movie-card">
+                            <div class="movie-card-inner">
+                                <img :src="getImageUrl(movie, 'poster')" 
+                                     @error="$event.target.src='https://placehold.co/500x750/0a0a0a/1a1a1a?text=NO+POSTER'"
+                                     :alt="movie.movie_name"
+                                     class="movie-poster-img">
+                                <div class="movie-card-overlay">
+                                    <div class="movie-card-info">
+                                        <h3 class="movie-card-title" x-text="movie.movie_name"></h3>
+                                        <p class="movie-card-year" x-text="movie.release_date ? new Date(movie.release_date).getFullYear() : 'N/A'"></p>
+                                        <div class="movie-card-rating" x-show="movie.rating">
+                                            <span x-text="Number(movie.rating).toFixed(1)"></span>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
                         </div>
-                    </div>
-                </template>
-            </div>
-            
-            <div x-show="viewMode === 'list'" class="movies-list">
-                <div class="list-header">
-                    <div class="list-col list-col-poster">POSTER</div>
-                    <div class="list-col list-col-title">TITLE</div>
-                    <div class="list-col list-col-year">YEAR</div>
-                    <div class="list-col list-col-rating">RATING</div>
-                    <div class="list-col list-col-runtime">RUNTIME</div>
-                    <div class="list-col list-col-genres">GENRES</div>
-                </div>
-                <template x-for="movie in paginatedMovies" :key="movie.movie_id">
-                    <div @click="selectMovie(movie)" class="list-item">
-                        <div class="list-col list-col-poster">
-                            <img :src="getImageUrl(movie, 'poster')" 
-                                 @error="$event.target.src='https://placehold.co/92x138/0a0a0a/1a1a1a?text=NO'"
-                                 :alt="movie.movie_name"
-                                 class="list-poster">
-                        </div>
-                        <div class="list-col list-col-title">
-                            <span x-text="movie.movie_name"></span>
-                            <span class="list-original-title" x-show="movie.original_title" x-text="`[${movie.original_title}]`"></span>
-                        </div>
-                        <div class="list-col list-col-year" x-text="movie.release_date ? new Date(movie.release_date).getFullYear() : 'N/A'"></div>
-                        <div class="list-col list-col-rating">
-                            <span x-show="movie.rating" x-text="movie.rating"></span>
-                            <span x-show="!movie.rating">--</span>
-                        </div>
-                        <div class="list-col list-col-runtime" x-text="formatRuntime(movie.runtime_minutes)"></div>
-                        <div class="list-col list-col-genres">
-                            <span x-text="(movie.genres || []).slice(0, 3).join(', ')"></span>
-                        </div>
-                    </div>
-                </template>
-            </div>
-            
-            <div x-show="totalPages > 1" class="pagination">
-                <button @click="currentPage = Math.max(1, currentPage - 1)" 
-                        :disabled="currentPage === 1"
-                        class="pagination-btn">[PREV]</button>
-                
-                <div class="pagination-info">
-                    <span>PAGE</span>
-                    <input type="number" 
-                           x-model.number="currentPage" 
-                           @change="currentPage = Math.max(1, Math.min(totalPages, currentPage))"
-                           :max="totalPages"
-                           min="1"
-                           class="pagination-input">
-                    <span>OF</span>
-                    <span x-text="totalPages"></span>
+                    </template>
                 </div>
                 
-                <button @click="currentPage = Math.min(totalPages, currentPage + 1)" 
-                        :disabled="currentPage === totalPages"
-                        class="pagination-btn">[NEXT]</button>
+                <div x-show="viewMode === 'list'" class="movies-list">
+                    <div class="list-header">
+                        <div class="list-col list-col-poster">POSTER</div>
+                        <div class="list-col list-col-title">TITLE</div>
+                        <div class="list-col list-col-year">YEAR</div>
+                        <div class="list-col list-col-rating">RATING</div>
+                        <div class="list-col list-col-runtime">RUNTIME</div>
+                        <div class="list-col list-col-genres">GENRES</div>
+                    </div>
+                    <template x-for="movie in paginatedMovies" :key="movie.movie_id">
+                        <div @click="selectMovie(movie)" class="list-item">
+                            <div class="list-col list-col-poster">
+                                <img :src="getImageUrl(movie, 'poster')" 
+                                     @error="$event.target.src='https://placehold.co/92x138/0a0a0a/1a1a1a?text=NO'"
+                                     :alt="movie.movie_name"
+                                     class="list-poster">
+                            </div>
+                            <div class="list-col list-col-title">
+                                <span x-text="movie.movie_name"></span>
+                                <span class="list-original-title" x-show="movie.original_title" x-text="`[${movie.original_title}]`"></span>
+                            </div>
+                            <div class="list-col list-col-year" x-text="movie.release_date ? new Date(movie.release_date).getFullYear() : 'N/A'"></div>
+                            <div class="list-col list-col-rating">
+                                <span x-show="movie.rating" x-text="movie.rating"></span>
+                                <span x-show="!movie.rating">--</span>
+                            </div>
+                            <div class="list-col list-col-runtime" x-text="formatRuntime(movie.runtime_minutes)"></div>
+                            <div class="list-col list-col-genres">
+                                <span x-text="(movie.genres || []).slice(0, 3).join(', ')"></span>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+                
+                <div x-show="totalPages > 1" class="pagination">
+                    <button @click="currentPage = Math.max(1, currentPage - 1)" 
+                            :disabled="currentPage === 1"
+                            class="pagination-btn">[PREV]</button>
+                    
+                    <div class="pagination-info">
+                        <span>PAGE</span>
+                        <input type="number" 
+                               x-model.number="currentPage" 
+                               @change="currentPage = Math.max(1, Math.min(totalPages, currentPage))"
+                               :max="totalPages"
+                               min="1"
+                               class="pagination-input">
+                        <span>OF</span>
+                        <span x-text="totalPages"></span>
+                    </div>
+                    
+                    <button @click="currentPage = Math.min(totalPages, currentPage + 1)" 
+                            :disabled="currentPage === totalPages"
+                            class="pagination-btn">[NEXT]</button>
+                </div>
+            </div>
+
+            <div x-show="currentView === 'statistics'" x-cloak class="statistics-page" style="padding: 2rem;">
+                <h2 class="section-title" style="margin-bottom: 2rem; font-size: 1.5rem;">&gt;&gt; DATABASE STATISTICS</h2>
+                
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1.5rem; margin-bottom: 2rem;">
+                    <div class="stat-card" style="background-color: #1a1a1a; padding: 1.5rem; border: 1px solid #333;">
+                        <h3 class="stat-title" style="font-size: 1rem; color: #888; margin-bottom: 0.5rem;">TOTAL_MOVIES</h3>
+                        <p class="stat-value" x-text="statistics?.total_movies" style="font-size: 2.5rem; font-weight: bold; color: #fff;"></p>
+                    </div>
+                    <div class="stat-card" style="background-color: #1a1a1a; padding: 1.5rem; border: 1px solid #333;">
+                        <h3 class="stat-title" style="font-size: 1rem; color: #888; margin-bottom: 0.5rem;">TOTAL_MEDIA_SIZE</h3>
+                        <p class="stat-value" x-text="`${statistics?.total_size_gb} GB`" style="font-size: 2.5rem; font-weight: bold; color: #fff;"></p>
+                    </div>
+                    <div class="stat-card" style="background-color: #1a1a1a; padding: 1.5rem; border: 1px solid #333;">
+                        <h3 class="stat-title" style="font-size: 1rem; color: #888; margin-bottom: 0.5rem;">TOTAL_WATCH_TIME</h3>
+                        <p class="stat-value" x-text="`${statistics?.total_runtime_hours} Hours`" style="font-size: 2.5rem; font-weight: bold; color: #fff;"></p>
+                    </div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem;">
+                    <div class="stat-list-card" style="background-color: #1a1a1a; padding: 1.5rem; border: 1px solid #333;">
+                         <h3 class="section-title" style="margin-bottom: 1rem;">&gt;&gt; TOP 10 GENRES</h3>
+                         <ul style="list-style: none; padding: 0;">
+                            <template x-for="genre in statistics?.movies_per_genre" :key="genre.genre_name">
+                                <li style="display: flex; justify-content: space-between; padding: 0.5rem 0; border-bottom: 1px solid #222;">
+                                    <span x-text="genre.genre_name" style="color: #ccc;"></span>
+                                    <span x-text="genre.count" style="color: #fff; font-weight: bold;"></span>
+                                </li>
+                            </template>
+                         </ul>
+                    </div>
+                    <div class="stat-list-card" style="background-color: #1a1a1a; padding: 1.5rem; border: 1px solid #333;">
+                         <h3 class="section-title" style="margin-bottom: 1rem;">&gt;&gt; MOVIES PER YEAR</h3>
+                         <ul style="list-style: none; padding: 0; max-height: 400px; overflow-y: auto;">
+                            <template x-for="year in statistics?.movies_per_year" :key="year.year">
+                                <li style="display: flex; justify-content: space-between; padding: 0.5rem 0; border-bottom: 1px solid #222;">
+                                    <span x-text="year.year" style="color: #ccc;"></span>
+                                    <span x-text="year.count" style="color: #fff; font-weight: bold;"></span>
+                                </li>
+                            </template>
+                         </ul>
+                    </div>
+                </div>
             </div>
         </main>
         
