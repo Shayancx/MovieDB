@@ -6,13 +6,17 @@ require 'json'
 
 # --- DATABASE CONNECTION WITH ERROR HANDLING ---
 begin
+  # Load database config from new location
+  db_config_path = File.join(File.dirname(__FILE__), 'config', 'database.yml')
+  db_config = YAML.load_file(db_config_path) if File.exist?(db_config_path)
+  
   DB = Sequel.connect(
     adapter: 'postgres',
-    host: ENV['DB_HOST'] || 'localhost',
-    port: ENV['DB_PORT'] || 5432,
-    database: ENV['DB_NAME'] || 'MovieDB',
-    user: ENV['DB_USER'] || 'shayan',
-    password: ENV['DB_PASSWORD'] || ''
+    host: db_config&.[]('host') || ENV['DB_HOST'] || 'localhost',
+    port: db_config&.[]('port') || ENV['DB_PORT'] || 5432,
+    database: db_config&.[]('dbname') || ENV['DB_NAME'] || 'MovieDB',
+    user: db_config&.[]('user') || ENV['DB_USER'] || 'shayan',
+    password: db_config&.[]('password') || ENV['DB_PASSWORD'] || ''
   )
   DB.extension :pg_array
   DB.test_connection
@@ -40,9 +44,9 @@ class MovieExplorer < Roda
       response['Content-Type'] = 'application/json'
       { error: 'API route not found' }
     else
-      # For any other path, serve the main index.html to let the frontend handle routing.
+      # Updated path
       response['Content-Type'] = 'text/html'
-      File.read('index.html')
+      File.read(File.join('public', 'index.html'))
     end
   end
   
@@ -67,7 +71,7 @@ class MovieExplorer < Roda
 
     r.root do
       response['Content-Type'] = 'text/html'
-      File.read('index.html')
+      File.read(File.join('public', 'index.html'))  # Updated path
     end
 
     r.on 'api' do

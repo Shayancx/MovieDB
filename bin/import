@@ -59,7 +59,7 @@ TMDB_API_BASE_URL = 'https://api.themoviedb.org/3'
 # The base URL for fetching TMDB images.
 TMDB_IMAGE_BASE_URL = 'https://image.tmdb.org/t/p/original'
 # The root directory where media assets (posters, backdrops) will be stored.
-MEDIA_BASE_DIR = File.join(Dir.pwd, 'media')
+MEDIA_BASE_DIR = File.join(File.dirname(__FILE__), '..', 'storage', 'media')
 # The maximum number of concurrent threads for background tasks like downloads.
 # Can be overridden by the MAX_BG_THREADS environment variable.
 MAX_BG_THREADS = ENV.fetch('MAX_BG_THREADS', 5).to_i
@@ -296,7 +296,8 @@ end
 class DatabaseService
   attr_reader :conn
 
-  def initialize(config_file = 'database.yml')
+  def initialize(config_file = nil)
+    config_file ||= File.join(File.dirname(__FILE__), '..', 'config', 'database.yml')
     @db_config = load_db_config(config_file)
     @conn = connect_to_db
   end

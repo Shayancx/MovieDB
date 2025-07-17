@@ -12,8 +12,8 @@ require 'erb'
 def check_database_connection
   begin
     # Load database configuration with ERB support for environment variables
-    if File.exist?('database.yml')
-      db_config = YAML.load(ERB.new(File.read('database.yml')).result)
+    if File.exist?(File.join(File.dirname(__FILE__), '..', 'config', 'database.yml'))
+      db_config = YAML.load(ERB.new(File.read(File.join(File.dirname(__FILE__), '..', 'config', 'database.yml'))).result)
     else
       return { status: "✗ Failed", error: "database.yml not found" }
     end
@@ -190,7 +190,7 @@ puts ""
 null_io = StringIO.new
 
 # Load the Rack app from config.ru
-app, options = Rack::Builder.parse_file('config.ru')
+app, options = Rack::Builder.parse_file(File.join(File.dirname(__FILE__), '..', 'config.ru'))
 
 # Create Puma configuration
 puma_config = Puma::Configuration.new do |config|
