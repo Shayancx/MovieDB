@@ -26,8 +26,8 @@ RSpec.describe 'MovieExplorer API' do
 
   describe 'GET /api/movies' do
     it 'returns movies from the database' do
-      dataset = double('dataset', all: [{movie_id: 1, movie_name: 'Test Movie'}])
-      allow(db).to receive(:fetch).and_return(dataset)
+      allow(MovieService).to receive(:filtered)
+        .and_return([{ movie_id: 1, movie_name: 'Test Movie' }])
 
       get '/api/movies'
 
@@ -39,8 +39,7 @@ RSpec.describe 'MovieExplorer API' do
 
   describe 'GET /api/movie/:id when not found' do
     it 'returns 404' do
-      dataset = double('dataset', first: nil)
-      allow(db).to receive(:fetch).and_return(dataset)
+      allow(MovieService).to receive(:find).and_return(nil)
 
       get '/api/movie/1'
 

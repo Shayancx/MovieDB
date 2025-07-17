@@ -18,6 +18,7 @@ group :test do
   gem 'rack-test'
   gem 'rspec'
   gem 'webmock'
+  gem 'simplecov', require: false
 end
 
 # importer.rb

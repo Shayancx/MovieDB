@@ -30,4 +30,15 @@ RSpec.describe TmdbClient do
     details = client.get_movie_details(1)
     expect(details['id']).to eq(1)
   end
+
+  it 'downloads image and returns relative path' do
+    client = TmdbClient.new
+    allow(File).to receive(:exist?).and_return(false)
+    allow(FileUtils).to receive(:mkdir_p)
+    fake_io = StringIO.new('data')
+    allow(URI).to receive(:open).and_yield(fake_io)
+    allow(File).to receive(:open)
+    path = client.download_image('/poster.jpg', 'movies/1/poster.jpg')
+    expect(path).to eq('movies/1/poster.jpg')
+  end
 end
