@@ -1,0 +1,31 @@
+<div class="movie-page">
+  <div class="movie-layout">
+    <div class="movie-poster">
+      <img src="<%= image_url(@movie, 'poster') %>" alt="<%= @movie[:movie_name] %>">
+    </div>
+    <div class="movie-info">
+      <h2><%= @movie[:movie_name] %></h2>
+      <% if @movie[:original_title] %>
+        <p>[<%= @movie[:original_title] %>]</p>
+      <% end %>
+      <p><strong>Release:</strong> <%= format_date(@movie[:release_date]) %></p>
+      <p><strong>Runtime:</strong> <%= format_runtime(@movie[:runtime_minutes]) %></p>
+      <% if @movie[:rating] %>
+        <p><strong>Rating:</strong> <%= sprintf('%.1f', @movie[:rating]) %></p>
+      <% end %>
+      <% if @movie[:description] %>
+        <p class="description"><%= @movie[:description] %></p>
+      <% end %>
+      <% if @movie[:genres]&.any? %>
+        <p><strong>Genres:</strong> <%= @movie[:genres].join(', ') %></p>
+      <% end %>
+      <% if @movie[:languages]&.any? %>
+        <p><strong>Languages:</strong> <%= @movie[:languages].join(', ') %></p>
+      <% end %>
+      <% if @movie[:countries]&.any? %>
+        <p><strong>Countries:</strong> <%= @movie[:countries].join(', ') %></p>
+      <% end %>
+    </div>
+  </div>
+  <p><a href="/movies">[BACK_TO_LIST]</a></p>
+</div>

@@ -26,6 +26,64 @@ class MovieService
       ).all
     end
 
+    def filtered(filters)
+      sql = <<~SQL
+        SELECT
+          m.movie_id, m.movie_name, m.original_title, m.release_date,
+          m.runtime_minutes, m.rating, m.franchise_id, m.poster_path,
+          m.imdb_id, m.tmdb_id,
+          f.franchise_name,
+          COALESCE(ARRAY_AGG(DISTINCT g.genre_name) FILTER (WHERE g.genre_name IS NOT NULL), '{}') AS genres,
+          COALESCE(ARRAY_AGG(DISTINCT c.country_name) FILTER (WHERE c.country_name IS NOT NULL), '{}') AS countries,
+          COALESCE(ARRAY_AGG(DISTINCT l.language_name) FILTER (WHERE l.language_name IS NOT NULL), '{}') AS languages
+        FROM movies m
+        LEFT JOIN franchises f ON f.franchise_id = m.franchise_id
+        LEFT JOIN movie_genres mg ON mg.movie_id = m.movie_id
+        LEFT JOIN genres g ON g.genre_id = mg.genre_id
+        LEFT JOIN movie_countries mc ON mc.movie_id = m.movie_id
+        LEFT JOIN countries c ON c.country_id = mc.country_id
+        LEFT JOIN movie_languages ml ON ml.movie_id = m.movie_id
+        LEFT JOIN languages l ON l.language_id = ml.language_id
+        WHERE 1=1
+      SQL
+      args = []
+      if filters[:search] && !filters[:search].empty?
+        sql << " AND (m.movie_name ILIKE ? OR m.original_title ILIKE ?)"
+        args << "%#{filters[:search]}%" << "%#{filters[:search]}%"
+      end
+      if filters[:genre] && !filters[:genre].empty?
+        sql << " AND g.genre_name = ?"
+        args << filters[:genre]
+      end
+      if filters[:country] && !filters[:country].empty?
+        sql << " AND c.country_name = ?"
+        args << filters[:country]
+      end
+      if filters[:language] && !filters[:language].empty?
+        sql << " AND l.language_name = ?"
+        args << filters[:language]
+      end
+      if filters[:franchise] && !filters[:franchise].empty?
+        sql << " AND m.franchise_id = ?"
+        args << filters[:franchise]
+      end
+      if filters[:year] && !filters[:year].empty?
+        sql << " AND EXTRACT(YEAR FROM m.release_date) = ?"
+        args << filters[:year].to_i
+      end
+      sql << " GROUP BY m.movie_id, f.franchise_name"
+      sort_by = case filters[:sort_by]
+                when 'date' then 'm.release_date'
+                when 'rating' then 'm.rating'
+                when 'runtime' then 'm.runtime_minutes'
+                else 'm.movie_name'
+                end
+      order = filters[:sort_order] == 'desc' ? 'DESC' : 'ASC'
+      sql << " ORDER BY #{sort_by} #{order}"
+
+      DB.fetch(sql, *args).all
+    end
+
     def find(movie_id)
       movie = DB.fetch(<<~SQL, movie_id).first
         SELECT
@@ -113,6 +171,15 @@ class MovieService
 
     def franchises
       DB[:franchises].order(:franchise_name).all
+    end
+
+    def years
+      DB[:movies]
+        .exclude(release_date: nil)
+        .select{extract(:year, :release_date).as(:year)}
+        .distinct
+        .order(Sequel.desc(:year))
+        .map { |r| r[:year].to_i }
     end
   end
 end
