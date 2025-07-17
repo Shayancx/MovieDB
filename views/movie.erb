@@ -1,31 +1,244 @@
-<div class="movie-page">
-  <div class="movie-layout">
-    <div class="movie-poster">
-      <img src="<%= image_url(@movie, 'poster') %>" alt="<%= @movie[:movie_name] %>">
+<div class="movie-page" x-data="{ activeTab: 'general' }">
+  <div class="tab-navigation">
+    <button @click="activeTab = 'general'" :class="{ 'active': activeTab === 'general' }" class="tab-button">
+      <span class="tab-number">01</span>
+      <span class="tab-label">GENERAL</span>
+    </button>
+    <button @click="activeTab = 'cast'" :class="{ 'active': activeTab === 'cast' }" class="tab-button">
+      <span class="tab-number">02</span>
+      <span class="tab-label">CAST_CREW</span>
+    </button>
+    <button @click="activeTab = 'technical'" :class="{ 'active': activeTab === 'technical' }" class="tab-button">
+      <span class="tab-number">03</span>
+      <span class="tab-label">TECHNICAL</span>
+    </button>
+  </div>
+
+  <div class="tab-content">
+    <div x-show="activeTab === 'general'" class="tab-panel">
+      <div class="movie-layout">
+        <div class="movie-poster">
+          <img src="<%= image_url(@movie, 'poster') %>" alt="<%= @movie[:movie_name] %>">
+        </div>
+        <div class="movie-info">
+          <% if @movie[:rating] %>
+          <div class="info-section-box">
+            <h3 class="section-title">&gt;&gt; RATING</h3>
+            <div class="rating-display">
+              <span class="rating-value"><%= sprintf('%.1f', @movie[:rating]) %></span>
+              <span class="rating-max">/ 10</span>
+            </div>
+          </div>
+          <% end %>
+
+          <div class="info-section-box">
+            <h3 class="section-title">&gt;&gt; DESCRIPTION</h3>
+            <p class="description"><%= @movie[:description] || 'No description available.' %></p>
+          </div>
+
+          <div class="details-grid">
+            <div class="detail-item">
+              <span class="detail-label">RELEASE_DATE:</span>
+              <span class="detail-value"><%= format_date(@movie[:release_date]) %></span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">RUNTIME:</span>
+              <span class="detail-value"><%= format_runtime(@movie[:runtime_minutes]) %></span>
+            </div>
+            <% if @movie[:franchise_name] %>
+            <div class="detail-item">
+              <span class="detail-label">FRANCHISE:</span>
+              <span class="detail-value"><%= @movie[:franchise_name] %></span>
+            </div>
+            <% end %>
+            <div class="detail-item">
+              <span class="detail-label">FILES:</span>
+              <span class="detail-value"><%= (@movie[:files] || []).length %> file(s)</span>
+            </div>
+          </div>
+
+          <% if @movie[:genres]&.any? %>
+          <div class="info-section">
+            <h3 class="section-title">&gt;&gt; GENRES</h3>
+            <div class="tag-list">
+              <% @movie[:genres].each do |genre| %>
+                <span class="tag"><%= genre %></span>
+              <% end %>
+            </div>
+          </div>
+          <% end %>
+
+          <% if @movie[:languages]&.any? %>
+          <div class="info-section">
+            <h3 class="section-title">&gt;&gt; LANGUAGES</h3>
+            <div class="tag-list">
+              <% @movie[:languages].each do |lang| %>
+                <span class="tag"><%= lang %></span>
+              <% end %>
+            </div>
+          </div>
+          <% end %>
+
+          <% if @movie[:countries]&.any? %>
+          <div class="info-section">
+            <h3 class="section-title">&gt;&gt; COUNTRIES</h3>
+            <div class="tag-list">
+              <% @movie[:countries].each do |country| %>
+                <span class="tag"><%= country %></span>
+              <% end %>
+            </div>
+          </div>
+          <% end %>
+
+          <div class="info-section">
+            <h3 class="section-title">&gt;&gt; EXTERNAL_LINKS</h3>
+            <div class="external-links">
+              <% if @movie[:imdb_id] %>
+              <a href="https://www.imdb.com/title/<%= @movie[:imdb_id] %>" target="_blank" class="external-link">IMDB</a>
+              <% end %>
+              <% if @movie[:tmdb_id] %>
+              <a href="https://www.themoviedb.org/movie/<%= @movie[:tmdb_id] %>" target="_blank" class="external-link">TMDB</a>
+              <% end %>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
-    <div class="movie-info">
-      <h2><%= @movie[:movie_name] %></h2>
-      <% if @movie[:original_title] %>
-        <p>[<%= @movie[:original_title] %>]</p>
+
+    <div x-show="activeTab === 'cast'" class="tab-panel">
+      <% if @movie[:directors]&.any? %>
+      <div class="crew-section">
+        <h3 class="section-title">&gt;&gt; DIRECTORS</h3>
+        <div class="crew-list">
+          <% @movie[:directors].each do |director| %>
+          <div class="crew-item">
+            <span class="crew-name"><%= director %></span>
+          </div>
+          <% end %>
+        </div>
+      </div>
       <% end %>
-      <p><strong>Release:</strong> <%= format_date(@movie[:release_date]) %></p>
-      <p><strong>Runtime:</strong> <%= format_runtime(@movie[:runtime_minutes]) %></p>
-      <% if @movie[:rating] %>
-        <p><strong>Rating:</strong> <%= sprintf('%.1f', @movie[:rating]) %></p>
+
+      <% if @movie[:writers]&.any? %>
+      <div class="crew-section">
+        <h3 class="section-title">&gt;&gt; WRITERS</h3>
+        <div class="crew-list">
+          <% @movie[:writers].each do |writer| %>
+          <div class="crew-item">
+            <span class="crew-name"><%= writer[:full_name] %></span>
+            <span class="crew-role">[<%= writer[:credit_type_name] %>]</span>
+          </div>
+          <% end %>
+        </div>
+      </div>
       <% end %>
-      <% if @movie[:description] %>
-        <p class="description"><%= @movie[:description] %></p>
+
+      <% if @movie[:cast]&.any? %>
+      <div class="crew-section">
+        <h3 class="section-title">&gt;&gt; CAST</h3>
+        <div class="cast-grid">
+          <% @movie[:cast].each do |actor| %>
+          <div class="cast-item">
+            <img src="<%= image_url(actor, 'person') %>" alt="<%= actor[:full_name] %>" class="cast-photo">
+            <div class="cast-details">
+              <div class="cast-name"><%= actor[:full_name] %></div>
+              <div class="cast-character">as <%= actor[:character_name] %></div>
+              <% if actor[:role_name] %>
+              <div class="cast-role">[<%= actor[:role_name] %>]</div>
+              <% end %>
+            </div>
+          </div>
+          <% end %>
+        </div>
+      </div>
       <% end %>
-      <% if @movie[:genres]&.any? %>
-        <p><strong>Genres:</strong> <%= @movie[:genres].join(', ') %></p>
-      <% end %>
-      <% if @movie[:languages]&.any? %>
-        <p><strong>Languages:</strong> <%= @movie[:languages].join(', ') %></p>
-      <% end %>
-      <% if @movie[:countries]&.any? %>
-        <p><strong>Countries:</strong> <%= @movie[:countries].join(', ') %></p>
-      <% end %>
+    </div>
+
+    <div x-show="activeTab === 'technical'" class="tab-panel">
+      <div class="files-section">
+        <% (@movie[:files] || []).each_with_index do |file, index| %>
+        <div class="file-block">
+          <div class="file-header">
+            <span class="file-number">FILE_<%= '%02d' % (index + 1) %></span>
+            <span class="file-name"><%= file[:file_name] %></span>
+          </div>
+          <div class="file-path">
+            <span class="path-label">PATH:</span>
+            <span class="path-value"><%= file[:file_path] %></span>
+          </div>
+          <div class="file-details">
+            <div class="file-detail-grid">
+              <div class="file-detail">
+                <span class="detail-label">FORMAT:</span>
+                <span><%= file[:file_format] || 'N/A' %></span>
+              </div>
+              <div class="file-detail">
+                <span class="detail-label">SIZE:</span>
+                <span><%= file[:file_size_mb] ? "#{file[:file_size_mb]} MB" : 'N/A' %></span>
+              </div>
+              <div class="file-detail">
+                <span class="detail-label">RESOLUTION:</span>
+                <span><%= file[:resolution_name] || 'N/A' %></span>
+              </div>
+              <div class="file-detail">
+                <span class="detail-label">VIDEO_CODEC:</span>
+                <span><%= file[:video_codec] || 'N/A' %></span>
+              </div>
+              <div class="file-detail">
+                <span class="detail-label">BITRATE:</span>
+                <span><%= file[:video_bitrate_kbps] ? "#{file[:video_bitrate_kbps]} kbps" : 'N/A' %></span>
+              </div>
+              <div class="file-detail">
+                <span class="detail-label">ASPECT_RATIO:</span>
+                <span><%= file[:aspect_ratio] || 'N/A' %></span>
+              </div>
+              <div class="file-detail">
+                <span class="detail-label">FRAMERATE:</span>
+                <span><%= file[:frame_rate_fps] ? "#{file[:frame_rate_fps]} fps" : 'N/A' %></span>
+              </div>
+              <div class="file-detail">
+                <span class="detail-label">SOURCE:</span>
+                <span><%= file[:source_type] || 'N/A' %></span>
+              </div>
+            </div>
+
+            <% if file[:audio_tracks]&.any? %>
+            <div class="tracks-section">
+              <h4 class="tracks-title">// AUDIO_TRACKS</h4>
+              <div class="tracks-list">
+                <% file[:audio_tracks].each do |track| %>
+                <div class="track-item">
+                  <span class="track-order">[<%= track[:track_order] %>]</span>
+                  <span><%= track[:language] || 'Unknown' %></span>
+                  <span class="track-codec"><%= track[:codec] %></span>
+                  <span class="track-channels"><%= track[:channels] %></span>
+                  <span class="track-bitrate"><%= track[:bitrate_kbps] ? "#{track[:bitrate_kbps]} kbps" : 'N/A' %></span>
+                </div>
+                <% end %>
+              </div>
+            </div>
+            <% end %>
+
+            <% if file[:subtitles]&.any? %>
+            <div class="tracks-section">
+              <h4 class="tracks-title">// SUBTITLES</h4>
+              <div class="tracks-list">
+                <% file[:subtitles].each do |sub| %>
+                <div class="track-item">
+                  <span><%= sub[:language] || 'Unknown' %></span>
+                  <span class="track-format">[<%= sub[:format] %>]</span>
+                  <span class="track-type"><%= sub[:is_embedded] ? 'EMBEDDED' : 'EXTERNAL' %></span>
+                </div>
+                <% end %>
+              </div>
+            </div>
+            <% end %>
+          </div>
+        </div>
+        <% end %>
+      </div>
     </div>
   </div>
+
   <p><a href="/movies">[BACK_TO_LIST]</a></p>
 </div>
