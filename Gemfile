@@ -7,6 +7,7 @@ gem 'puma'
 gem 'rack'
 gem 'rackup'
 gem 'json'
+gem 'tilt'
 
 # Development and test gems
 gem 'rake'

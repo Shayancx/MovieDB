@@ -1,0 +1,329 @@
+        <div x-show="selectedMovie" x-cloak class="movie-modal">
+            <div @click="closeMovie()" class="movie-modal-backdrop" 
+                 x-show="selectedMovie" 
+                 x-transition:enter="transition ease-out duration-300"
+                 x-transition:enter-start="opacity-0"
+                 x-transition:enter-end="opacity-100"
+                 x-transition:leave="transition ease-in duration-200"
+                 x-transition:leave-start="opacity-100"
+                 x-transition:leave-end="opacity-0"></div>
+            
+            <div class="movie-modal-content" 
+                 x-show="selectedMovie"
+                 x-transition:enter="transition ease-out duration-300"
+                 x-transition:enter-start="opacity-0 translate-y-4"
+                 x-transition:enter-end="opacity-100 translate-y-0"
+                 x-transition:leave="transition ease-in duration-200"
+                 x-transition:leave-start="opacity-100 translate-y-0"
+                 x-transition:leave-end="opacity-0 translate-y-4">
+                
+                <div class="modal-header">
+                    <div class="modal-title">
+                        <h2 x-text="selectedMovie?.movie_name"></h2>
+                        <p x-show="selectedMovie?.original_title" x-text="`[${selectedMovie?.original_title}]`"></p>
+                    </div>
+                    <button @click="closeMovie()" class="modal-close">[ESC]</button>
+                </div>
+                
+                <div class="modal-backdrop" 
+                     x-show="selectedMovie?.backdrop_path"
+                     :style="`background-image: url(${getImageUrl(selectedMovie, 'backdrop')})`"></div>
+                
+                <div class="modal-body">
+                    <div class="tab-navigation">
+                        <button @click="activeTab = 'general'" 
+                                :class="{ 'active': activeTab === 'general' }" 
+                                class="tab-button">
+                            <span class="tab-number">01</span>
+                            <span class="tab-label">GENERAL</span>
+                        </button>
+                        <button @click="activeTab = 'cast'" 
+                                :class="{ 'active': activeTab === 'cast' }" 
+                                class="tab-button">
+                            <span class="tab-number">02</span>
+                            <span class="tab-label">CAST_CREW</span>
+                        </button>
+                        <button @click="activeTab = 'technical'" 
+                                :class="{ 'active': activeTab === 'technical' }" 
+                                class="tab-button">
+                            <span class="tab-number">03</span>
+                            <span class="tab-label">TECHNICAL</span>
+                        </button>
+                    </div>
+                    
+                    <div class="tab-content">
+                        <div x-show="activeTab === 'general'" class="tab-panel">
+                            <div class="movie-layout">
+                                <div class="movie-poster">
+                                    <img :src="getImageUrl(selectedMovie, 'poster')" 
+                                         @error="$event.target.src='https://placehold.co/500x750/0a0a0a/1a1a1a?text=NO+POSTER'"
+                                         :alt="selectedMovie?.movie_name">
+                                </div>
+                                
+                                <div class="movie-info">
+                                    <div class="info-section-box" x-show="selectedMovie?.rating">
+                                        <h3 class="section-title">&gt;&gt; RATING</h3>
+                                        <div class="rating-display">
+                                            <span class="rating-value" x-text="selectedMovie?.rating ? Number(selectedMovie.rating).toFixed(1) : 'N/A'"></span>
+                                            <span class="rating-max">/ 10</span>
+                                        </div>
+                                    </div>
+
+                                    <div class="info-section-box">
+                                        <h3 class="section-title">&gt;&gt; DESCRIPTION</h3>
+                                        <p class="description" x-text="selectedMovie?.description || 'No description available.'"></p>
+                                    </div>
+                                    
+                                    <div class="details-grid">
+                                        <div class="detail-item">
+                                            <span class="detail-label">RELEASE_DATE:</span>
+                                            <span class="detail-value" x-text="formatDate(selectedMovie?.release_date)"></span>
+                                        </div>
+                                        <div class="detail-item">
+                                            <span class="detail-label">RUNTIME:</span>
+                                            <span class="detail-value" x-text="formatRuntime(selectedMovie?.runtime_minutes)"></span>
+                                        </div>
+                                        <div class="detail-item" x-show="selectedMovie?.franchise_name">
+                                            <span class="detail-label">FRANCHISE:</span>
+                                            <span class="detail-value" x-text="selectedMovie?.franchise_name"></span>
+                                        </div>
+                                        <div class="detail-item">
+                                            <span class="detail-label">FILES:</span>
+                                            <span class="detail-value" x-text="`${selectedMovie?.files?.length || 0} file(s)`"></span>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="info-section" x-show="selectedMovie?.genres?.length">
+                                        <h3 class="section-title">&gt;&gt; GENRES</h3>
+                                        <div class="tag-list">
+                                            <template x-for="genre in selectedMovie?.genres" :key="genre">
+                                                <a :href="`#/genre/${encodeURIComponent(genre)}`" class="tag" x-text="genre"></a>
+                                            </template>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="info-section" x-show="selectedMovie?.languages?.length">
+                                        <h3 class="section-title">&gt;&gt; LANGUAGES</h3>
+                                        <div class="tag-list">
+                                            <template x-for="lang in selectedMovie?.languages" :key="lang">
+                                                <a :href="`#/language/${encodeURIComponent(lang)}`" class="tag" x-text="lang"></a>
+                                            </template>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="info-section" x-show="selectedMovie?.countries?.length">
+                                        <h3 class="section-title">&gt;&gt; COUNTRIES</h3>
+                                        <div class="tag-list">
+                                            <template x-for="country in selectedMovie?.countries" :key="country">
+                                                <a :href="`#/country/${encodeURIComponent(country)}`" class="tag" x-text="country"></a>
+                                            </template>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="info-section">
+                                        <h3 class="section-title">&gt;&gt; EXTERNAL_LINKS</h3>
+                                        <div class="external-links">
+                                            <a x-show="selectedMovie?.imdb_id" 
+                                               :href="`https://www.imdb.com/title/${selectedMovie?.imdb_id}`" 
+                                               target="_blank" 
+                                               class="external-link">IMDB</a>
+                                            <a x-show="selectedMovie?.tmdb_id" 
+                                               :href="`https://www.themoviedb.org/movie/${selectedMovie?.tmdb_id}`" 
+                                               target="_blank" 
+                                               class="external-link">TMDB</a>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div x-show="activeTab === 'cast'" class="tab-panel">
+                            <div class="crew-section" x-show="selectedMovie?.directors?.length">
+                                <h3 class="section-title">&gt;&gt; DIRECTORS</h3>
+                                <div class="crew-list">
+                                    <template x-for="director in selectedMovie?.directors" :key="director">
+                                        <div class="crew-item">
+                                            <span class="crew-name" x-text="director"></span>
+                                        </div>
+                                    </template>
+                                </div>
+                            </div>
+                            
+                            <div class="crew-section" x-show="selectedMovie?.writers?.length">
+                                <h3 class="section-title">&gt;&gt; WRITERS</h3>
+                                <div class="crew-list">
+                                    <template x-for="writer in selectedMovie?.writers" :key="writer.person_id">
+                                        <div class="crew-item">
+                                            <span class="crew-name" x-text="writer.full_name"></span>
+                                            <span class="crew-role" x-text="`[${writer.credit_type_name}]`"></span>
+                                        </div>
+                                    </template>
+                                </div>
+                            </div>
+                            
+                            <div class="crew-section" x-show="selectedMovie?.cast?.length">
+                                <h3 class="section-title">&gt;&gt; CAST</h3>
+                                <div class="cast-grid">
+                                    <template x-for="actor in selectedMovie?.cast" :key="actor.cast_id">
+                                        <div @click.stop="selectPerson(actor)" class="cast-item">
+                                            <img :src="getImageUrl(actor, 'person')" 
+                                                 @error="$event.target.src='https://placehold.co/200x300/0a0a0a/1a1a1a?text=NO+PHOTO'"
+                                                 :alt="actor.full_name"
+                                                 class="cast-photo">
+                                            <div class="cast-details">
+                                                <div class="cast-name" x-text="actor.full_name"></div>
+                                                <div class="cast-character" x-text="`as ${actor.character_name}`"></div>
+                                                <div class="cast-role" x-show="actor.role_name" x-text="`[${actor.role_name}]`"></div>
+                                            </div>
+                                        </div>
+                                    </template>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div x-show="activeTab === 'technical'" class="tab-panel">
+                            <div class="files-section">
+                                <template x-for="(file, index) in selectedMovie?.files" :key="file.file_id">
+                                    <div class="file-block">
+                                        <div class="file-header">
+                                            <span class="file-number" x-text="`FILE_${String(index + 1).padStart(2, '0')}`"></span>
+                                            <span class="file-name" x-text="file.file_name"></span>
+                                        </div>
+                                        
+                                        <div class="file-path">
+                                            <span class="path-label">PATH:</span>
+                                            <span class="path-value" x-text="file.file_path"></span>
+                                        </div>
+                                        
+                                        <div class="file-details">
+                                            <div class="file-detail-grid">
+                                                <div class="file-detail">
+                                                    <span class="detail-label">FORMAT:</span>
+                                                    <span x-text="file.file_format || 'N/A'"></span>
+                                                </div>
+                                                <div class="file-detail">
+                                                    <span class="detail-label">SIZE:</span>
+                                                    <span x-text="formatFileSize(file.file_size_mb)"></span>
+                                                </div>
+                                                <div class="file-detail">
+                                                    <span class="detail-label">RESOLUTION:</span>
+                                                    <span x-text="file.resolution_name || 'N/A'"></span>
+                                                </div>
+                                                <div class="file-detail">
+                                                    <span class="detail-label">VIDEO_CODEC:</span>
+                                                    <span x-text="file.video_codec || 'N/A'"></span>
+                                                </div>
+                                                <div class="file-detail">
+                                                    <span class="detail-label">BITRATE:</span>
+                                                    <span x-text="formatBitrate(file.video_bitrate_kbps)"></span>
+                                                </div>
+                                                <div class="file-detail">
+                                                    <span class="detail-label">ASPECT_RATIO:</span>
+                                                    <span x-text="file.aspect_ratio || 'N/A'"></span>
+                                                </div>
+                                                <div class="file-detail">
+                                                    <span class="detail-label">FRAMERATE:</span>
+                                                    <span x-text="file.frame_rate_fps ? `${file.frame_rate_fps} fps` : 'N/A'"></span>
+                                                </div>
+                                                <div class="file-detail">
+                                                    <span class="detail-label">SOURCE:</span>
+                                                    <span x-text="file.source_type || 'N/A'"></span>
+                                                </div>
+                                            </div>
+                                            
+                                            <div class="tracks-section" x-show="file.audio_tracks?.length">
+                                                <h4 class="tracks-title">// AUDIO_TRACKS</h4>
+                                                <div class="tracks-list">
+                                                    <template x-for="track in file.audio_tracks" :key="track.track_id">
+                                                        <div class="track-item">
+                                                            <span class="track-order" x-text="`[${track.track_order}]`"></span>
+                                                            <span x-text="track.language || 'Unknown'"></span>
+                                                            <span class="track-codec" x-text="track.codec"></span>
+                                                            <span class="track-channels" x-text="track.channels"></span>
+                                                            <span class="track-bitrate" x-text="formatBitrate(track.bitrate_kbps)"></span>
+                                                        </div>
+                                                    </template>
+                                                </div>
+                                            </div>
+                                            
+                                            <div class="tracks-section" x-show="file.subtitles?.length">
+                                                <h4 class="tracks-title">// SUBTITLES</h4>
+                                                <div class="tracks-list">
+                                                    <template x-for="sub in file.subtitles" :key="sub.subtitle_id">
+                                                        <div class="track-item">
+                                                            <span x-text="sub.language || 'Unknown'"></span>
+                                                            <span class="track-format" x-text="`[${sub.format}]`"></span>
+                                                            <span class="track-type" x-text="sub.is_embedded ? 'EMBEDDED' : 'EXTERNAL'"></span>
+                                                        </div>
+                                                    </template>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </template>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div x-show="selectedPerson" x-cloak class="movie-modal">
+            <div @click="closePerson()" class="movie-modal-backdrop" 
+                 x-show="selectedPerson" 
+                 x-transition:enter="transition ease-out duration-300"
+                 x-transition:enter-start="opacity-0"
+                 x-transition:enter-end="opacity-100"
+                 x-transition:leave="transition ease-in duration-200"
+                 x-transition:leave-start="opacity-100"
+                 x-transition:leave-end="opacity-0"></div>
+            
+            <div class="movie-modal-content" 
+                 x-show="selectedPerson"
+                 x-transition:enter="transition ease-out duration-300"
+                 x-transition:enter-start="opacity-0 translate-y-4"
+                 x-transition:enter-end="opacity-100 translate-y-0"
+                 x-transition:leave="transition ease-in duration-200"
+                 x-transition:leave-start="opacity-100 translate-y-0"
+                 x-transition:leave-end="opacity-0 translate-y-4">
+                
+                <div class="modal-header">
+                    <div class="modal-title">
+                        <h2 x-text="selectedPerson?.full_name"></h2>
+                    </div>
+                    <button @click="closePerson()" class="modal-close">[ESC]</button>
+                </div>
+                
+                <div class="modal-body">
+                    <div class="person-layout">
+                        <div class="person-photo">
+                            <img :src="getImageUrl(selectedPerson, 'person')" 
+                                 @error="$event.target.src='https://placehold.co/500x750/0a0a0a/1a1a1a?text=NO+PHOTO'"
+                                 :alt="selectedPerson?.full_name">
+                        </div>
+                        
+                        <div class="person-info">
+                            <div class="info-section">
+                                <h3 class="section-title">&gt;&gt; FILMOGRAPHY</h3>
+                                <div class="filmography-grid">
+                                    <template x-for="movie in selectedPerson?.movies" :key="movie.movie_id">
+                                        <div class="movie-card" @click="selectMovieFromPerson(movie)">
+                                            <div class="movie-card-inner">
+                                                <img :src="getImageUrl(movie, 'poster')" 
+                                                     @error="$event.target.src='https://placehold.co/500x750/0a0a0a/1a1a1a?text=NO+POSTER'"
+                                                     :alt="movie.movie_name"
+                                                     class="movie-poster-img">
+                                                <div class="movie-card-overlay">
+                                                    <h3 class="movie-card-title" x-text="movie.movie_name"></h3>
+                                                    <p class="movie-card-year" x-text="movie.release_date ? new Date(movie.release_date).getFullYear() : 'N/A'"></p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </template>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>

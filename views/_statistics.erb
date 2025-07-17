@@ -1,0 +1,43 @@
+            <div x-show="currentView === 'statistics'" x-cloak class="statistics-page">
+                <h2 class="statistics-heading">&gt;&gt; DATABASE STATISTICS</h2>
+
+                <div class="stats-summary">
+                    <div class="stat-card">
+                        <h3 class="stat-title">TOTAL_MOVIES</h3>
+                        <p class="stat-value" x-text="statistics?.total_movies"></p>
+                    </div>
+                    <div class="stat-card">
+                        <h3 class="stat-title">TOTAL_MEDIA_SIZE</h3>
+                        <p class="stat-value" x-text="`${statistics?.total_size_gb} GB`"></p>
+                    </div>
+                    <div class="stat-card">
+                        <h3 class="stat-title">TOTAL_WATCH_TIME</h3>
+                        <p class="stat-value" x-text="`${statistics?.total_runtime_hours} Hours`"></p>
+                    </div>
+                </div>
+
+                <div class="stats-lists">
+                    <div class="stat-list-card">
+                         <h3 class="section-title">&gt;&gt; TOP 10 GENRES</h3>
+                         <ul class="stat-list">
+                            <template x-for="genre in statistics?.movies_per_genre" :key="genre.genre_name">
+                                <li class="stat-list-item">
+                                    <span class="stat-list-name" x-text="genre.genre_name"></span>
+                                    <span class="stat-list-value" x-text="genre.count"></span>
+                                </li>
+                            </template>
+                         </ul>
+                    </div>
+                    <div class="stat-list-card">
+                         <h3 class="section-title">&gt;&gt; MOVIES PER YEAR</h3>
+                         <ul class="stat-list scrollable">
+                            <template x-for="year in statistics?.movies_per_year" :key="year.year">
+                                <li class="stat-list-item">
+                                    <span class="stat-list-name" x-text="year.year"></span>
+                                    <span class="stat-list-value" x-text="year.count"></span>
+                                </li>
+                            </template>
+                         </ul>
+                    </div>
+                </div>
+            </div>

@@ -13,6 +13,7 @@ class MovieExplorer < Roda
   plugin :json
   plugin :all_verbs
   plugin :halt
+  plugin :render
   
   
   
@@ -22,9 +23,8 @@ class MovieExplorer < Roda
       response['Content-Type'] = 'application/json'
       { error: 'API route not found' }
     else
-      # Updated path
       response['Content-Type'] = 'text/html'
-      File.read(File.join('public', 'index.html'))
+      view('layout')
     end
   end
   
@@ -49,7 +49,7 @@ class MovieExplorer < Roda
 
     r.root do
       response['Content-Type'] = 'text/html'
-      File.read(File.join('public', 'index.html'))  # Updated path
+      view('layout')
     end
 
     r.on 'api' do
