@@ -2,7 +2,10 @@ require 'spec_helper'
 
 RSpec.describe 'TMDBMovieImporter' do
   before do
+    db = double('db', extension: nil, test_connection: nil)
+    allow(Sequel).to receive(:connect).and_return(db)
     load File.expand_path('../../../app/services/tmdb_movie_importer.rb', __FILE__)
+    stub_const('DB', db)
   end
 
   let(:importer) { TMDBMovieImporter.allocate }

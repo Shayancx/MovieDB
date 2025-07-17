@@ -38,4 +38,9 @@ RSpec.describe 'PersonService' do
     expect(person[:movies].first[:movie_id]).to eq(1)
     expect(@db.captured.first.values.first).to eq(1)
   end
+
+  it 'returns nil when person does not exist' do
+    allow(@db).to receive(:first).and_return(nil)
+    expect(PersonService.find(2)).to be_nil
+  end
 end

@@ -38,4 +38,10 @@ RSpec.describe 'StatisticsService' do
     expect(summary[:total_size_gb]).to eq((100 / 1024.0).round(2))
     expect(summary[:movies_per_genre]).to be_a(Array)
   end
+
+  it 'handles nil sums gracefully' do
+    allow(DB).to receive(:sum).and_return(nil)
+    summary = StatisticsService.summary
+    expect(summary[:total_size_gb]).to eq(0)
+  end
 end

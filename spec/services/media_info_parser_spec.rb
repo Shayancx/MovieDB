@@ -47,4 +47,10 @@ RSpec.describe 'MediaInfoParser' do
     parser.send(:parse)
     expect(parser).not_to be_valid
   end
+
+  it 'returns nil aspect ratio when mapping missing' do
+    parser = MediaInfoParser.allocate
+    parser.instance_variable_set(:@media, 'track' => [{ '@type' => 'Video', 'DisplayAspectRatio' => '1.21:1' }])
+    expect(parser.send(:normalize_aspect_ratio, '1.21:1')).to be_nil
+  end
 end

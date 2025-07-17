@@ -29,7 +29,7 @@ class MovieService
     end
 
     def filtered(filters)
-      sql = <<~SQL
+      sql = <<~SQL.dup
         SELECT
           m.movie_id, m.movie_name, m.original_title, m.release_date,
           m.runtime_minutes, m.rating, m.franchise_id, m.poster_path,
