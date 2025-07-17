@@ -2,7 +2,7 @@
   <div class="controls-section">
     <form class="search-bar" method="get" action="/movies">
       <span class="search-icon">&gt;</span>
-      <input type="text" name="search" value="<%= params['search'] %>" placeholder="SEARCH_MOVIES..." class="search-input">
+      <input type="text" name="search" value="<%= request.params['search'] %>" placeholder="SEARCH_MOVIES..." class="search-input">
     </form>
     <div class="control-buttons">
       <button type="button" x-on:click="showFilters = !showFilters" :class="{ 'active': showFilters }" class="control-btn">
@@ -22,7 +22,7 @@
         <select name="genre" class="filter-select">
           <option value="">ALL_GENRES</option>
           <% @genres.each do |g| %>
-            <option value="<%= g[:genre_name] %>" <%= 'selected' if params['genre'] == g[:genre_name] %>><%= g[:genre_name] %></option>
+            <option value="<%= g[:genre_name] %>" <%= 'selected' if request.params['genre'] == g[:genre_name] %>><%= g[:genre_name] %></option>
           <% end %>
         </select>
       </div>
@@ -31,7 +31,7 @@
         <select name="year" class="filter-select">
           <option value="">ALL_YEARS</option>
           <% @years.each do |y| %>
-            <option value="<%= y %>" <%= 'selected' if params['year'].to_s == y.to_s %>><%= y %></option>
+            <option value="<%= y %>" <%= 'selected' if request.params['year'].to_s == y.to_s %>><%= y %></option>
           <% end %>
         </select>
       </div>
@@ -40,7 +40,7 @@
         <select name="country" class="filter-select">
           <option value="">ALL_COUNTRIES</option>
           <% @countries.each do |c| %>
-            <option value="<%= c[:country_name] %>" <%= 'selected' if params['country'] == c[:country_name] %>><%= c[:country_name] %></option>
+            <option value="<%= c[:country_name] %>" <%= 'selected' if request.params['country'] == c[:country_name] %>><%= c[:country_name] %></option>
           <% end %>
         </select>
       </div>
@@ -49,7 +49,7 @@
         <select name="language" class="filter-select">
           <option value="">ALL_LANGUAGES</option>
           <% @languages.each do |l| %>
-            <option value="<%= l[:language_name] %>" <%= 'selected' if params['language'] == l[:language_name] %>><%= l[:language_name] %></option>
+            <option value="<%= l[:language_name] %>" <%= 'selected' if request.params['language'] == l[:language_name] %>><%= l[:language_name] %></option>
           <% end %>
         </select>
       </div>
@@ -58,24 +58,24 @@
         <select name="franchise" class="filter-select">
           <option value="">ALL_FRANCHISES</option>
           <% @franchises.each do |f| %>
-            <option value="<%= f[:franchise_id] %>" <%= 'selected' if params['franchise'] == f[:franchise_id].to_s %>><%= f[:franchise_name] %></option>
+            <option value="<%= f[:franchise_id] %>" <%= 'selected' if request.params['franchise'] == f[:franchise_id].to_s %>><%= f[:franchise_name] %></option>
           <% end %>
         </select>
       </div>
       <div class="filter-group">
         <label class="filter-label">SORT_BY:</label>
         <select name="sort_by" class="filter-select">
-          <option value="name" <%= 'selected' if params['sort_by'] == 'name' %>>NAME</option>
-          <option value="date" <%= 'selected' if params['sort_by'] == 'date' %>>RELEASE_DATE</option>
-          <option value="rating" <%= 'selected' if params['sort_by'] == 'rating' %>>RATING</option>
-          <option value="runtime" <%= 'selected' if params['sort_by'] == 'runtime' %>>RUNTIME</option>
+          <option value="name" <%= 'selected' if request.params['sort_by'] == 'name' %>>NAME</option>
+          <option value="date" <%= 'selected' if request.params['sort_by'] == 'date' %>>RELEASE_DATE</option>
+          <option value="rating" <%= 'selected' if request.params['sort_by'] == 'rating' %>>RATING</option>
+          <option value="runtime" <%= 'selected' if request.params['sort_by'] == 'runtime' %>>RUNTIME</option>
         </select>
       </div>
       <div class="filter-group">
         <label class="filter-label">ORDER:</label>
         <select name="sort_order" class="filter-select">
-          <option value="asc" <%= 'selected' if params['sort_order'] == 'asc' %>>ASCENDING</option>
-          <option value="desc" <%= 'selected' if params['sort_order'] == 'desc' %>>DESCENDING</option>
+          <option value="asc" <%= 'selected' if request.params['sort_order'] == 'asc' %>>ASCENDING</option>
+          <option value="desc" <%= 'selected' if request.params['sort_order'] == 'desc' %>>DESCENDING</option>
         </select>
       </div>
       <div class="filter-group">
