@@ -2,7 +2,7 @@ require 'spec_helper'
 require 'json'
 
 ENV['TMDB_API_KEY'] ||= 'testkey'
-load File.expand_path('../../bin/import', __dir__)
+require_relative '../../app/services/tmdb_client'
 
 RSpec.describe TmdbClient do
   before do

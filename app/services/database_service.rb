@@ -1,26 +1,23 @@
-require 'pg'
-require 'yaml'
 require 'set'
+require_relative '../db'
 require_relative 'pretty_logger'
 
 class DatabaseService
   attr_reader :conn
 
-  def initialize(config_file = nil)
-    config_file ||= File.expand_path('../../config/database.yml', __dir__)
-    @db_config = load_db_config(config_file)
-    @conn = connect_to_db
+  def initialize(_config_file = nil)
+    @conn = DB
   end
 
   def get_existing_file_paths
-    @conn.exec('SELECT file_path FROM movie_files').map { |row| row['file_path'] }.to_set
+    DB[:movie_files].select(:file_path).map { |row| row[:file_path] }.to_set
   end
 
   def insert_movie(details)
     franchise_id = get_or_create_franchise(details['belongs_to_collection'])
     sql = <<~SQL
       INSERT INTO movies (movie_name, original_title, release_date, description, runtime_minutes, imdb_id, tmdb_id, rating, franchise_id)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT (tmdb_id) DO UPDATE SET
         movie_name = EXCLUDED.movie_name,
         original_title = EXCLUDED.original_title,
@@ -31,12 +28,16 @@ class DatabaseService
         rating = EXCLUDED.rating
       RETURNING movie_id
     SQL
-    result = @conn.exec_params(sql, [
-      details['title'], details['original_title'], details['release_date'],
-      details['overview'], details['runtime'], details['imdb_id'], details['id'],
-      details['vote_average']&.round(1), franchise_id
-    ])
-    result.first['movie_id'].to_i
+    DB[sql,
+       details['title'],
+       details['original_title'],
+       details['release_date'],
+       details['overview'],
+       details['runtime'],
+       details['imdb_id'],
+       details['id'],
+       details['vote_average']&.round(1),
+       franchise_id].get(:movie_id).to_i
   end
 
   def insert_movie_file(movie_id, file_path, mediainfo)
@@ -45,16 +46,23 @@ class DatabaseService
     source_type_id = get_or_create_generic('source_media_types', 'source_type_name', 'source_type_id', guess_source_media_type(file_path))
     sql = <<~SQL
       INSERT INTO movie_files (movie_id, file_name, file_path, file_format, file_size_mb, resolution_id, video_bitrate_kbps, video_codec_id, frame_rate_fps, aspect_ratio, duration_minutes, source_media_type_id)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT (file_path) DO NOTHING
       RETURNING file_id
     SQL
-    result = @conn.exec_params(sql, [
-      movie_id, File.basename(file_path), File.absolute_path(file_path),
-      mediainfo.file_format, mediainfo.file_size_mb, resolution_id, mediainfo.video_bitrate_kbps,
-      video_codec_id, mediainfo.frame_rate, mediainfo.aspect_ratio, mediainfo.duration_minutes, source_type_id
-    ])
-    result.ntuples > 0 ? result.first['file_id'].to_i : nil
+    DB[sql,
+       movie_id,
+       File.basename(file_path),
+       File.absolute_path(file_path),
+       mediainfo.file_format,
+       mediainfo.file_size_mb,
+       resolution_id,
+       mediainfo.video_bitrate_kbps,
+       video_codec_id,
+       mediainfo.frame_rate,
+       mediainfo.aspect_ratio,
+       mediainfo.duration_minutes,
+       source_type_id].get(:file_id)&.to_i
   end
 
   def bulk_import_associations(movie_id, details)
@@ -79,41 +87,18 @@ class DatabaseService
   end
 
   def update_record(table:, id_col:, id_val:, data:)
-    sql = "UPDATE #{table} SET "
-    sql += data.keys.map.with_index { |k, i| "#{k} = $#{i + 1}" }.join(', ')
-    sql += " WHERE #{id_col} = $#{data.size + 1}"
-    values = data.values + [id_val]
-    @conn.exec_params(sql, values)
+    DB[table.to_sym].where(id_col.to_sym => id_val).update(data)
     PrettyLogger.debug("DB updated for #{table}##{id_val}")
-  rescue PG::Error => e
+  rescue Sequel::DatabaseError => e
     PrettyLogger.error("DB update failed for #{table}##{id_val}: #{e.message}")
   end
 
   def close
-    @conn&.close
+    @conn.disconnect if @conn.respond_to?(:disconnect)
   end
 
   private
 
-  def load_db_config(config_file)
-    YAML.load_file(config_file)
-  rescue Errno::ENOENT
-    PrettyLogger.warn("Database config '#{config_file}' not found. Using ENV variables or defaults.")
-    {
-      'host' => ENV['DB_HOST'] || 'localhost',
-      'port' => ENV['DB_PORT'] || 5432,
-      'dbname' => ENV['DB_NAME'] || 'MovieDB',
-      'user' => ENV['DB_USER'] || ENV['USER'] || 'postgres',
-      'password' => ENV['DB_PASSWORD'] || ''
-    }
-  end
-
-  def connect_to_db
-    PG.connect(@db_config)
-  rescue PG::Error => e
-    PrettyLogger.error("Failed to connect to PostgreSQL database: #{e.message}")
-    raise
-  end
 
   def get_or_create_generic_bulk(table, name_col, id_col, names)
     return [] if names.empty?
@@ -131,8 +116,7 @@ class DatabaseService
       UNION ALL
       SELECT #{id_col}, #{name_col} FROM #{table} WHERE #{name_col} = ANY($1)
     SQL
-    res = @conn.exec_params(sql, [names])
-    res.map { |r| r[id_col] }
+    DB[sql, Sequel.pg_array(names)].map { |r| r[id_col.to_sym] }
   end
 
   def get_or_create_code_name_bulk(table, code_col, name_col, id_col, data)
@@ -152,8 +136,7 @@ class DatabaseService
       UNION ALL
       SELECT #{id_col}, #{code_col} FROM #{table} WHERE #{code_col} = ANY($1)
     SQL
-    res = @conn.exec_params(sql, [codes, data.map(&:last)])
-    res.map { |r| r[id_col] }
+    DB[sql, Sequel.pg_array(codes), Sequel.pg_array(data.map(&:last))].map { |r| r[id_col.to_sym] }
   end
 
   def get_or_create_people_bulk(people)
@@ -173,15 +156,17 @@ class DatabaseService
       UNION ALL
       SELECT person_id, tmdb_id FROM people WHERE tmdb_id = ANY($1)
     SQL
-    res = @conn.exec_params(sql, [tmdb_ids, people.map { |p| p['name'] }])
-    res.each_with_object({}) { |r, h| h[r['tmdb_id'].to_i] = r['person_id'].to_i }
+    DB[sql, Sequel.pg_array(tmdb_ids), Sequel.pg_array(people.map { |p| p['name'] })]
+      .each_with_object({}) { |r, h| h[r[:tmdb_id].to_i] = r[:person_id].to_i }
   end
 
   def link_generic_bulk(link_table, movie_id_col, other_id_col, movie_id, other_ids)
     return if other_ids.empty?
-    @conn.copy_data "COPY #{link_table} (#{movie_id_col}, #{other_id_col}) FROM STDIN" do
-      other_ids.uniq.each do |other_id|
-        @conn.put_copy_data "#{movie_id}\t#{other_id}\n"
+    DB.synchronize do |c|
+      c.copy_data "COPY #{link_table} (#{movie_id_col}, #{other_id_col}) FROM STDIN" do
+        other_ids.uniq.each do |other_id|
+          c.put_copy_data "#{movie_id}\t#{other_id}\n"
+        end
       end
     end
   rescue PG::UniqueViolation
@@ -190,12 +175,14 @@ class DatabaseService
 
   def link_cast_bulk(movie_id, cast_data, people_map)
     return if cast_data.empty?
-    @conn.copy_data "COPY movie_cast (movie_id, person_id, character_name, billing_order) FROM STDIN" do
-      cast_data.each do |member|
-        person_id = people_map[member['id']]
-        next unless person_id && member['character']
-        row = [movie_id, person_id, member['character'], member['order'] + 1].join("\t")
-        @conn.put_copy_data "#{row}\n"
+    DB.synchronize do |c|
+      c.copy_data "COPY movie_cast (movie_id, person_id, character_name, billing_order) FROM STDIN" do
+        cast_data.each do |member|
+          person_id = people_map[member['id']]
+          next unless person_id && member['character']
+          row = [movie_id, person_id, member['character'], member['order'] + 1].join("\t")
+          c.put_copy_data "#{row}\n"
+        end
       end
     end
   rescue PG::UniqueViolation
@@ -218,9 +205,8 @@ class DatabaseService
 
   def get_or_create_resolution(width, height)
     return nil unless width && height > 0
-    sql = 'SELECT resolution_id FROM video_resolutions WHERE width_pixels = $1 AND height_pixels = $2'
-    res = @conn.exec_params(sql, [width, height])
-    return res.first['resolution_id'] if res.ntuples > 0
+    res = DB[:video_resolutions].where(width_pixels: width, height_pixels: height).get(:resolution_id)
+    return res if res
     name = case height
            when 2160.. then '4K'
            when 1080 then '1080p'
@@ -228,17 +214,16 @@ class DatabaseService
            when 480 then '480p'
            else "#{height}p"
            end
-    insert_sql = 'INSERT INTO video_resolutions (resolution_name, width_pixels, height_pixels) VALUES ($1, $2, $3) RETURNING resolution_id'
-    @conn.exec_params(insert_sql, [name, width, height]).first['resolution_id']
+    insert_sql = 'INSERT INTO video_resolutions (resolution_name, width_pixels, height_pixels) VALUES (?, ?, ?) RETURNING resolution_id'
+    DB[insert_sql, name, width, height].get(:resolution_id)
   end
 
   def get_or_create_generic(table, name_col, id_col, name)
     return nil if name.nil? || name.to_s.strip.empty?
-    find_sql = "SELECT #{id_col} FROM #{table} WHERE #{name_col} = $1"
-    result = @conn.exec_params(find_sql, [name])
-    return result.first[id_col] if result.ntuples > 0
-    insert_sql = "INSERT INTO #{table} (#{name_col}) VALUES ($1) ON CONFLICT(#{name_col}) DO UPDATE SET #{name_col}=EXCLUDED.#{name_col} RETURNING #{id_col}"
-    @conn.exec_params(insert_sql, [name]).first[id_col]
+    id = DB[table.to_sym].where(name_col.to_sym => name).get(id_col.to_sym)
+    return id if id
+    insert_sql = "INSERT INTO #{table} (#{name_col}) VALUES (?) ON CONFLICT(#{name_col}) DO UPDATE SET #{name_col}=EXCLUDED.#{name_col} RETURNING #{id_col}"
+    DB[insert_sql, name].get(id_col.to_sym)
   end
 
   def guess_source_media_type(file_path)
