@@ -54,11 +54,11 @@ class MovieExplorer < Roda
       response.status = 404
       response['Content-Type'] = 'application/json'
       { error: 'API route not found' }
-    else
-      response['Content-Type'] = 'text/html'
-      view('layout')
+      else
+        response['Content-Type'] = 'text/html'
+        view('not_found')
+      end
     end
-  end
   
   plugin :error_handler do |e|
     warn "Error: #{e.message}"

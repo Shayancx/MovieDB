@@ -176,7 +176,7 @@ class MovieService
     def years
       DB[:movies]
         .exclude(release_date: nil)
-        .select{extract(:year, :release_date).as(:year)}
+        .select{Sequel.function(:date_part, 'year', :release_date).as(:year)}
         .distinct
         .order(Sequel.desc(:year))
         .map { |r| r[:year].to_i }

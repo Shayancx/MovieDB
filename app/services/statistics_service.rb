@@ -16,8 +16,8 @@ class StatisticsService
 
       movies_per_year = DB[:movies]
         .where { release_date !~ nil }
-        .group_and_count(Sequel.extract(:year, :release_date))
-        .order(Sequel.desc(Sequel.extract(:year, :release_date)))
+        .group_and_count(Sequel.function(:date_part, 'year', :release_date))
+        .order(Sequel.desc(Sequel.function(:date_part, 'year', :release_date)))
         .all
 
       {
