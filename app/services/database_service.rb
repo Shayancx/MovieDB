@@ -204,7 +204,7 @@ class DatabaseService
   end
 
   def get_or_create_resolution(width, height)
-    return nil unless width && height > 0
+    return nil unless width.to_i.positive? && height.to_i.positive?
     res = DB[:video_resolutions].where(width_pixels: width, height_pixels: height).get(:resolution_id)
     return res if res
     name = case height
