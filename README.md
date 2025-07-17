@@ -51,3 +51,12 @@ The importer scans the given directory, fetches metadata from TMDB and stores it
 ## Development
 
 You can modify the application routes in `app.rb` and static assets in the `public/` directory.
+
+## Testing
+
+Install dependencies and run the test suite with Rake:
+
+```bash
+bundle install
+bundle exec rake
+```

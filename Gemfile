@@ -8,5 +8,14 @@ gem 'rack'
 gem 'rackup'
 gem 'json'
 
+# Development and test gems
+gem 'rake'
+
+group :test do
+  gem 'rspec'
+  gem 'rack-test'
+  gem 'webmock'
+end
+
 # importer.rb
 gem 'concurrent-ruby'
