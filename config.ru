@@ -2,8 +2,8 @@ require 'rack/static'
 require_relative 'app'
 
 # Updated paths for public directory
-use Rack::Static, 
-  urls: ["/css", "/js", "/index.html"],
+use Rack::Static,
+  urls: ["/css", "/js"],
   root: File.expand_path('public', __dir__)
 
 # Updated path for media files
