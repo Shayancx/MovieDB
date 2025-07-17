@@ -54,11 +54,11 @@
       </div>
     </header>
 
-    <%= erb :'_movie_modal' %>
+    <%= render :_movie_modal %>
 
     <main x-show="!selectedMovie">
-      <%= erb :'_movie_list' %>
-      <%= erb :'_statistics' %>
+      <%= render :_movie_list %>
+      <%= render :_statistics %>
     </main>
 
     <footer class="footer">
