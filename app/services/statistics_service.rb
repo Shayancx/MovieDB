@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require_relative '../db'
 
 class StatisticsService
@@ -8,17 +10,17 @@ class StatisticsService
       total_runtime_minutes = DB[:movies].sum(:runtime_minutes)
 
       movies_per_genre = DB[:movie_genres]
-        .join(:genres, genre_id: :genre_id)
-        .group_and_count(:genre_name)
-        .order(Sequel.desc(:count))
-        .limit(10)
-        .all
+                         .join(:genres, genre_id: :genre_id)
+                         .group_and_count(:genre_name)
+                         .order(Sequel.desc(:count))
+                         .limit(10)
+                         .all
 
       movies_per_year = DB[:movies]
-        .where { release_date !~ nil }
-        .group_and_count(Sequel.function(:date_part, 'year', :release_date))
-        .order(Sequel.desc(Sequel.function(:date_part, 'year', :release_date)))
-        .all
+                        .where { release_date !~ nil }
+                        .group_and_count(Sequel.function(:date_part, 'year', :release_date))
+                        .order(Sequel.desc(Sequel.function(:date_part, 'year', :release_date)))
+                        .all
 
       {
         total_movies: total_movies,

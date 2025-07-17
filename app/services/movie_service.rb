@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require_relative '../db'
 
 class MovieService
@@ -23,7 +25,7 @@ class MovieService
         GROUP BY m.movie_id, f.franchise_name
         ORDER BY m.movie_name
       SQL
-      ).all
+              ).all
     end
 
     def filtered(filters)
@@ -48,30 +50,30 @@ class MovieService
       SQL
       args = []
       if filters[:search] && !filters[:search].empty?
-        sql << " AND (m.movie_name ILIKE ? OR m.original_title ILIKE ?)"
+        sql << ' AND (m.movie_name ILIKE ? OR m.original_title ILIKE ?)'
         args << "%#{filters[:search]}%" << "%#{filters[:search]}%"
       end
       if filters[:genre] && !filters[:genre].empty?
-        sql << " AND g.genre_name = ?"
+        sql << ' AND g.genre_name = ?'
         args << filters[:genre]
       end
       if filters[:country] && !filters[:country].empty?
-        sql << " AND c.country_name = ?"
+        sql << ' AND c.country_name = ?'
         args << filters[:country]
       end
       if filters[:language] && !filters[:language].empty?
-        sql << " AND l.language_name = ?"
+        sql << ' AND l.language_name = ?'
         args << filters[:language]
       end
       if filters[:franchise] && !filters[:franchise].empty?
-        sql << " AND m.franchise_id = ?"
+        sql << ' AND m.franchise_id = ?'
         args << filters[:franchise]
       end
       if filters[:year] && !filters[:year].empty?
-        sql << " AND EXTRACT(YEAR FROM m.release_date) = ?"
+        sql << ' AND EXTRACT(YEAR FROM m.release_date) = ?'
         args << filters[:year].to_i
       end
-      sql << " GROUP BY m.movie_id, f.franchise_name"
+      sql << ' GROUP BY m.movie_id, f.franchise_name'
       sort_by = case filters[:sort_by]
                 when 'date' then 'm.release_date'
                 when 'rating' then 'm.rating'
@@ -111,46 +113,46 @@ class MovieService
       return nil unless movie
 
       movie[:directors] = DB[:movie_directors]
-        .join(:people, person_id: :person_id)
-        .where(Sequel[:movie_directors][:movie_id] => movie_id)
-        .select_map(:full_name)
+                          .join(:people, person_id: :person_id)
+                          .where(Sequel[:movie_directors][:movie_id] => movie_id)
+                          .select_map(:full_name)
 
       movie[:writers] = DB[:movie_writers]
-        .join(:people, person_id: Sequel[:movie_writers][:person_id])
-        .join(:credit_types, credit_type_id: Sequel[:movie_writers][:credit_type_id])
-        .where(Sequel[:movie_writers][:movie_id] => movie_id)
-        .select(Sequel[:people][:person_id], Sequel[:people][:full_name], Sequel[:credit_types][:credit_type_name])
-        .all
+                        .join(:people, person_id: Sequel[:movie_writers][:person_id])
+                        .join(:credit_types, credit_type_id: Sequel[:movie_writers][:credit_type_id])
+                        .where(Sequel[:movie_writers][:movie_id] => movie_id)
+                        .select(Sequel[:people][:person_id], Sequel[:people][:full_name], Sequel[:credit_types][:credit_type_name])
+                        .all
 
       movie[:cast] = DB[:movie_cast]
-        .join(:people, person_id: Sequel[:movie_cast][:person_id])
-        .left_join(:role_types, role_type_id: Sequel[:movie_cast][:role_type_id])
-        .where(Sequel[:movie_cast][:movie_id] => movie_id)
-        .order(:billing_order)
-        .select(:cast_id, Sequel[:people][:person_id], :full_name, :character_name, :billing_order, :role_name, :headshot_path)
-        .all
+                     .join(:people, person_id: Sequel[:movie_cast][:person_id])
+                     .left_join(:role_types, role_type_id: Sequel[:movie_cast][:role_type_id])
+                     .where(Sequel[:movie_cast][:movie_id] => movie_id)
+                     .order(:billing_order)
+                     .select(:cast_id, Sequel[:people][:person_id], :full_name, :character_name, :billing_order, :role_name, :headshot_path)
+                     .all
 
       files = DB[:movie_files]
-        .left_join(:video_resolutions, resolution_id: Sequel[:movie_files][:resolution_id])
-        .left_join(:video_codecs, codec_id: Sequel[:movie_files][:video_codec_id])
-        .left_join(:source_media_types, source_type_id: Sequel[:movie_files][:source_media_type_id])
-        .where(Sequel[:movie_files][:movie_id] => movie_id)
-        .order(:file_name)
-        .all
+              .left_join(:video_resolutions, resolution_id: Sequel[:movie_files][:resolution_id])
+              .left_join(:video_codecs, codec_id: Sequel[:movie_files][:video_codec_id])
+              .left_join(:source_media_types, source_type_id: Sequel[:movie_files][:source_media_type_id])
+              .where(Sequel[:movie_files][:movie_id] => movie_id)
+              .order(:file_name)
+              .all
 
       files.each do |file|
         file[:audio_tracks] = DB[:movie_file_audio_tracks]
-          .left_join(:audio_codecs, codec_id: Sequel[:movie_file_audio_tracks][:audio_codec_id])
-          .left_join(:languages, language_id: Sequel[:movie_file_audio_tracks][:language_id])
-          .where(file_id: file[:file_id])
-          .order(:track_order)
-          .all
+                              .left_join(:audio_codecs, codec_id: Sequel[:movie_file_audio_tracks][:audio_codec_id])
+                              .left_join(:languages, language_id: Sequel[:movie_file_audio_tracks][:language_id])
+                              .where(file_id: file[:file_id])
+                              .order(:track_order)
+                              .all
 
         file[:subtitles] = DB[:movie_file_subtitles]
-          .join(:languages, language_id: Sequel[:movie_file_subtitles][:language_id])
-          .where(file_id: file[:file_id])
-          .order(:track_order)
-          .all
+                           .join(:languages, language_id: Sequel[:movie_file_subtitles][:language_id])
+                           .where(file_id: file[:file_id])
+                           .order(:track_order)
+                           .all
       end
       movie[:files] = files
 
@@ -176,7 +178,7 @@ class MovieService
     def years
       DB[:movies]
         .exclude(release_date: nil)
-        .select{Sequel.function(:date_part, 'year', :release_date).as(:year)}
+        .select { Sequel.function(:date_part, 'year', :release_date).as(:year) }
         .distinct
         .order(Sequel.desc(:year))
         .map { |r| r[:year].to_i }

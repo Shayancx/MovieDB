@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 # config/environment.rb
 
 # Set up gems listed in the Gemfile.

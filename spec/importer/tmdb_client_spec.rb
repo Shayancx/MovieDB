@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require 'spec_helper'
 require 'json'
 
@@ -8,7 +10,8 @@ RSpec.describe TmdbClient do
   before do
     stub_request(:get, 'https://api.themoviedb.org/3/search/movie')
       .with(query: hash_including('api_key' => 'testkey', 'query' => 'Inception', 'year' => '2010'))
-      .to_return(status: 200, body: { results: [{ id: 1, title: 'Inception' }] }.to_json, headers: { 'Content-Type' => 'application/json' })
+      .to_return(status: 200, body: { results: [{ id: 1,
+                                                  title: 'Inception' }] }.to_json, headers: { 'Content-Type' => 'application/json' })
   end
 
   it 'search_movie fetches results from TMDB' do
@@ -20,7 +23,8 @@ RSpec.describe TmdbClient do
   it 'get_movie_details fetches movie details' do
     stub_request(:get, 'https://api.themoviedb.org/3/movie/1')
       .with(query: hash_including('api_key' => 'testkey', 'append_to_response' => 'credits,release_dates,images'))
-      .to_return(status: 200, body: { id: 1, title: 'Inception' }.to_json, headers: { 'Content-Type' => 'application/json' })
+      .to_return(status: 200, body: { id: 1,
+                                      title: 'Inception' }.to_json, headers: { 'Content-Type' => 'application/json' })
 
     client = TmdbClient.new
     details = client.get_movie_details(1)

@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require 'net/http'
 require 'json'
 require 'uri'
@@ -28,9 +30,11 @@ class TmdbClient
 
   def download_image(api_path, relative_save_path)
     return nil if api_path.nil? || api_path.empty?
+
     source_url = "#{TMDB_IMAGE_BASE_URL}#{api_path}"
     absolute_save_path = File.join(MEDIA_BASE_DIR, relative_save_path)
     return relative_save_path if File.exist?(absolute_save_path)
+
     FileUtils.mkdir_p(File.dirname(absolute_save_path))
     retry_with_backoff do
       URI.open(source_url) do |image|
@@ -39,7 +43,7 @@ class TmdbClient
     end
     PrettyLogger.debug("Downloaded image to #{relative_save_path}")
     relative_save_path
-  rescue => e
+  rescue StandardError => e
     PrettyLogger.warn("Failed to download image from #{source_url}: #{e.message}")
     nil
   end
@@ -65,7 +69,7 @@ class TmdbClient
       nil
     end
   rescue Net::OpenTimeout, Net::ReadTimeout, Errno::ECONNRESET => e
-    if retries > 0
+    if retries.positive?
       PrettyLogger.warn("Network error (#{e.class}). Retrying in #{5 - retries}s...")
       sleep(5 - retries)
       make_api_request(path, params, retries - 1)
@@ -78,7 +82,7 @@ class TmdbClient
   def retry_with_backoff(times = 3)
     yield
   rescue Net::OpenTimeout, Net::ReadTimeout, Errno::ECONNRESET, OpenURI::HTTPError => e
-    if (times -= 1) > 0
+    if (times -= 1).positive?
       sleep(3 - times)
       retry
     else

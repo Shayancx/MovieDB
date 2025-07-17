@@ -1,12 +1,22 @@
+# frozen_string_literal: true
+
 require 'concurrent'
 
 class PrettyLogger
   @@errors = Concurrent::Array.new
   @@warnings = Concurrent::Array.new
 
-  def self.info(msg); puts "[\e[34mINFO\e[0m] #{msg}"; end
-  def self.success(msg); puts "[\e[32mSUCCESS\e[0m] #{msg}"; end
-  def self.debug(msg); puts "[\e[35mDEBUG\e[0m] #{msg}" if ENV['DEBUG']; end
+  def self.info(msg)
+    puts "[\e[34mINFO\e[0m] #{msg}"
+  end
+
+  def self.success(msg)
+    puts "[\e[32mSUCCESS\e[0m] #{msg}"
+  end
+
+  def self.debug(msg)
+    puts "[\e[35mDEBUG\e[0m] #{msg}" if ENV['DEBUG']
+  end
 
   def self.warn(msg)
     @@warnings << msg

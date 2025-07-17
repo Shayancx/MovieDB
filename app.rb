@@ -1,4 +1,6 @@
 #!/usr/bin/env ruby
+# frozen_string_literal: true
+
 require_relative 'config/environment'
 require 'roda'
 require 'json'
@@ -8,7 +10,6 @@ require_relative 'app/services/movie_service'
 require_relative 'app/services/person_service'
 require_relative 'app/services/statistics_service'
 
-
 class MovieExplorer < Roda
   plugin :json
   plugin :all_verbs
@@ -16,50 +17,52 @@ class MovieExplorer < Roda
   plugin :render
 
   def image_url(item, type = 'poster')
-      return '' unless item
-      path = case type
-               when 'person' then item[:headshot_path]
-               when 'backdrop' then item[:backdrop_path]
-               else item[:poster_path]
-             end
-      placeholder = case type
-                      when 'person' then 'https://placehold.co/200x300/0a0a0a/1a1a1a?text=NO+PHOTO'
-                      when 'backdrop' then 'https://placehold.co/1280x720/0a0a0a/1a1a1a?text=NO+BACKDROP'
-                      else 'https://placehold.co/500x750/0a0a0a/1a1a1a?text=NO+POSTER'
-                    end
-      return placeholder unless path
-      "/media/#{path}"
+    return '' unless item
+
+    path = case type
+           when 'person' then item[:headshot_path]
+           when 'backdrop' then item[:backdrop_path]
+           else item[:poster_path]
+           end
+    placeholder = case type
+                  when 'person' then 'https://placehold.co/200x300/0a0a0a/1a1a1a?text=NO+PHOTO'
+                  when 'backdrop' then 'https://placehold.co/1280x720/0a0a0a/1a1a1a?text=NO+BACKDROP'
+                  else 'https://placehold.co/500x750/0a0a0a/1a1a1a?text=NO+POSTER'
+                  end
+    return placeholder unless path
+
+    "/media/#{path}"
   end
 
   def format_date(date)
-      return 'N/A' unless date
-      Date.parse(date.to_s).strftime('%B %d, %Y')
+    return 'N/A' unless date
+
+    Date.parse(date.to_s).strftime('%B %d, %Y')
   end
 
   def format_runtime(min)
-      return 'N/A' unless min
-      hours = min / 60
-      mins  = min % 60
-      "#{hours}h #{mins}m"
+    return 'N/A' unless min
+
+    hours = min / 60
+    mins  = min % 60
+    "#{hours}h #{mins}m"
   end
 
   def query_with_page(page)
-      Rack::Utils.build_query(request.GET.merge('page' => page))
+    Rack::Utils.build_query(request.GET.merge('page' => page))
   end
-  
-  
-  
+
   plugin :not_found do
     if request.path.start_with?('/api/')
       response.status = 404
       response['Content-Type'] = 'application/json'
       { error: 'API route not found' }
-      else
-        response['Content-Type'] = 'text/html'
-        view('not_found')
-      end
+    else
+      response['Content-Type'] = 'text/html'
+      view('not_found')
     end
-  
+  end
+
   plugin :error_handler do |e|
     warn "Error: #{e.message}"
     warn e.backtrace.join("\n")
@@ -69,14 +72,14 @@ class MovieExplorer < Roda
   end
 
   plugin :default_headers,
-    'Access-Control-Allow-Origin' => '*',
-    'Access-Control-Allow-Methods' => 'GET, POST, PUT, DELETE, OPTIONS',
-    'Access-Control-Allow-Headers' => 'Content-Type, Authorization'
+         'Access-Control-Allow-Origin' => '*',
+         'Access-Control-Allow-Methods' => 'GET, POST, PUT, DELETE, OPTIONS',
+         'Access-Control-Allow-Headers' => 'Content-Type, Authorization'
 
   route do |r|
     r.on method: :options do
       response.status = 204
-      ""
+      ''
     end
 
     r.root do
@@ -123,7 +126,7 @@ class MovieExplorer < Roda
 
     r.on 'api' do
       response['Content-Type'] = 'application/json'
-      
+
       r.get 'movies' do
         MovieService.filtered(r.params)
       end

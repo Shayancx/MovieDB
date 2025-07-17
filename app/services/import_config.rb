@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 module ImportConfig
   TMDB_API_BASE_URL = 'https://api.themoviedb.org/3'
   TMDB_IMAGE_BASE_URL = 'https://image.tmdb.org/t/p/original'

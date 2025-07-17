@@ -1,4 +1,6 @@
 #!/usr/bin/env ruby
+# frozen_string_literal: true
+
 require_relative '../app/services/tmdb_movie_importer'
 require_relative '../app/services/pretty_logger'
 require_relative '../app/services/import_config'
@@ -13,7 +15,7 @@ if __FILE__ == $PROGRAM_NAME
 
   movie_directory = ARGV[0]
   unless movie_directory && File.directory?(movie_directory)
-    puts "Usage: #{$0} [path_to_movie_directory]"
+    puts "Usage: #{$PROGRAM_NAME} [path_to_movie_directory]"
     exit 1
   end
 
@@ -33,7 +35,7 @@ if __FILE__ == $PROGRAM_NAME
     puts "\n\n[\e[33mWARN\e[0m] Import interrupted by user. Shutting down gracefully..."
     TUI.finish if TUI.active?
     exit 130
-  rescue => e
+  rescue StandardError => e
     PrettyLogger.error("A fatal error occurred: #{e.message}")
     PrettyLogger.debug(e.backtrace.join("\n"))
     TUI.finish if TUI.active?

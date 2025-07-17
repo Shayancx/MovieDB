@@ -1,3 +1,6 @@
+# frozen_string_literal: true
+
+require 'English'
 require 'json'
 
 class MediaInfoParser
@@ -7,7 +10,7 @@ class MediaInfoParser
 
   def initialize(file_path)
     json_output = `mediainfo --Output=JSON -f "#{file_path}"`
-    @data = $?.success? ? JSON.parse(json_output) : nil
+    @data = $CHILD_STATUS.success? ? JSON.parse(json_output) : nil
     @media = @data ? @data['media'] : nil
     parse
   end
@@ -20,9 +23,11 @@ class MediaInfoParser
 
   def parse
     return unless valid?
+
     general = track('General')
     video = track('Video')
     return unless general && video
+
     @file_format = general['Format']
     @duration_minutes = (general['Duration'].to_f / 60).round
     @file_size_mb = (general['FileSize'].to_f / 1024 / 1024).round

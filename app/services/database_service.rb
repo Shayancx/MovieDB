@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require 'set'
 require_relative '../db'
 require_relative 'pretty_logger'
@@ -43,7 +45,8 @@ class DatabaseService
   def insert_movie_file(movie_id, file_path, mediainfo)
     resolution_id = get_or_create_resolution(mediainfo.width, mediainfo.height)
     video_codec_id = get_or_create_generic('video_codecs', 'codec_name', 'codec_id', mediainfo.video_codec)
-    source_type_id = get_or_create_generic('source_media_types', 'source_type_name', 'source_type_id', guess_source_media_type(file_path))
+    source_type_id = get_or_create_generic('source_media_types', 'source_type_name', 'source_type_id',
+                                           guess_source_media_type(file_path))
     sql = <<~SQL
       INSERT INTO movie_files (movie_id, file_name, file_path, file_format, file_size_mb, resolution_id, video_bitrate_kbps, video_codec_id, frame_rate_fps, aspect_ratio, duration_minutes, source_media_type_id)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -67,7 +70,7 @@ class DatabaseService
 
   def bulk_import_associations(movie_id, details)
     cast_data = (details.dig('credits', 'cast') || []).first(50)
-    crew_data = (details.dig('credits', 'crew') || [])
+    crew_data = details.dig('credits', 'crew') || []
     people_data = (cast_data + crew_data).uniq { |p| p['id'] }
     people_map = get_or_create_people_bulk(people_data)
     link_cast_bulk(movie_id, cast_data, people_map)
@@ -78,7 +81,8 @@ class DatabaseService
     link_generic_bulk('movie_genres', 'movie_id', 'genre_id', movie_id, genre_ids)
 
     country_data = (details['production_countries'] || []).map { |c| [c['iso_3166_1'], c['name']] }
-    country_ids = get_or_create_code_name_bulk('production_countries', 'iso_3166_1_code', 'country_name', 'country_id', country_data)
+    country_ids = get_or_create_code_name_bulk('production_countries', 'iso_3166_1_code', 'country_name', 'country_id',
+                                               country_data)
     link_generic_bulk('movie_countries', 'movie_id', 'country_id', movie_id, country_ids)
 
     lang_data = (details['spoken_languages'] || []).map { |l| [l['iso_639_1'], l['english_name']] }
@@ -99,9 +103,9 @@ class DatabaseService
 
   private
 
-
   def get_or_create_generic_bulk(table, name_col, id_col, names)
     return [] if names.empty?
+
     sql = <<~SQL
       WITH new_names (name) AS (
         SELECT * FROM unnest($1::text[])
@@ -121,6 +125,7 @@ class DatabaseService
 
   def get_or_create_code_name_bulk(table, code_col, name_col, id_col, data)
     return [] if data.empty?
+
     codes = data.map(&:first)
     sql = <<~SQL
       WITH new_items (code, name) AS (
@@ -141,6 +146,7 @@ class DatabaseService
 
   def get_or_create_people_bulk(people)
     return {} if people.empty?
+
     tmdb_ids = people.map { |p| p['id'] }
     sql = <<~SQL
       WITH new_people (tmdb_id, full_name) AS (
@@ -162,6 +168,7 @@ class DatabaseService
 
   def link_generic_bulk(link_table, movie_id_col, other_id_col, movie_id, other_ids)
     return if other_ids.empty?
+
     DB.synchronize do |c|
       c.copy_data "COPY #{link_table} (#{movie_id_col}, #{other_id_col}) FROM STDIN" do
         other_ids.uniq.each do |other_id|
@@ -175,11 +182,13 @@ class DatabaseService
 
   def link_cast_bulk(movie_id, cast_data, people_map)
     return if cast_data.empty?
+
     DB.synchronize do |c|
-      c.copy_data "COPY movie_cast (movie_id, person_id, character_name, billing_order) FROM STDIN" do
+      c.copy_data 'COPY movie_cast (movie_id, person_id, character_name, billing_order) FROM STDIN' do
         cast_data.each do |member|
           person_id = people_map[member['id']]
           next unless person_id && member['character']
+
           row = [movie_id, person_id, member['character'], member['order'] + 1].join("\t")
           c.put_copy_data "#{row}\n"
         end
@@ -191,7 +200,7 @@ class DatabaseService
 
   def link_crew_bulk(movie_id, crew_data, people_map)
     directors = crew_data.select { |c| c['job'] == 'Director' }
-    writers = crew_data.select { |c| ['Screenplay', 'Writer', 'Story'].include?(c['job']) }
+    writers = crew_data.select { |c| %w[Screenplay Writer Story].include?(c['job']) }
     director_ids = directors.map { |d| people_map[d['id']] }.compact
     writer_ids = writers.map { |w| people_map[w['id']] }.compact
     link_generic_bulk('movie_directors', 'movie_id', 'person_id', movie_id, director_ids)
@@ -200,13 +209,16 @@ class DatabaseService
 
   def get_or_create_franchise(collection_data)
     return nil unless collection_data && collection_data['name']
+
     get_or_create_generic('franchises', 'franchise_name', 'franchise_id', collection_data['name'])
   end
 
   def get_or_create_resolution(width, height)
     return nil unless width.to_i.positive? && height.to_i.positive?
+
     res = DB[:video_resolutions].where(width_pixels: width, height_pixels: height).get(:resolution_id)
     return res if res
+
     name = case height
            when 2160.. then '4K'
            when 1080 then '1080p'
@@ -220,8 +232,10 @@ class DatabaseService
 
   def get_or_create_generic(table, name_col, id_col, name)
     return nil if name.nil? || name.to_s.strip.empty?
+
     id = DB[table.to_sym].where(name_col.to_sym => name).get(id_col.to_sym)
     return id if id
+
     insert_sql = "INSERT INTO #{table} (#{name_col}) VALUES (?) ON CONFLICT(#{name_col}) DO UPDATE SET #{name_col}=EXCLUDED.#{name_col} RETURNING #{id_col}"
     DB[insert_sql, name].get(id_col.to_sym)
   end
