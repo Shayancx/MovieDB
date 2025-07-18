@@ -24,9 +24,9 @@ RSpec.describe TMDBMovieImporter do
     allow(@db_service).to receive(:update_record)
     allow(@db_service).to receive(:close)
     
-    # Mock TMDBClient
-    @tmdb_client = instance_double(TMDBClient)
-    allow(TMDBClient).to receive(:new).and_return(@tmdb_client)
+    # Mock TmdbClient
+    @tmdb_client = instance_double(TmdbClient)
+    allow(TmdbClient).to receive(:new).and_return(@tmdb_client)
     allow(@tmdb_client).to receive(:search_movie).and_return([])
     allow(@tmdb_client).to receive(:get_movie_details).and_return(nil)
     allow(@tmdb_client).to receive(:download_image).and_return(nil)

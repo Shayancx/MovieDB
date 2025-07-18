@@ -6,7 +6,7 @@ require 'json'
 ENV['TMDB_API_KEY'] ||= 'testkey'
 require_relative '../../app/services/tmdb_client'
 
-RSpec.describe TMDBClient do
+RSpec.describe TmdbClient do
   let(:client) { described_class.new }
   let(:api_base) { 'https://api.themoviedb.org/3' }
 
@@ -194,7 +194,7 @@ RSpec.describe TMDBClient do
   describe '#download_image' do
     let(:image_url) { 'https://image.tmdb.org/t/p/original/poster.jpg' }
     let(:save_path) { 'movies/1/poster.jpg' }
-    let(:full_path) { File.join(TMDBClient::MEDIA_BASE_DIR, save_path) }
+    let(:full_path) { File.join(TmdbClient::MEDIA_BASE_DIR, save_path) }
 
     context 'with successful download' do
       before do
