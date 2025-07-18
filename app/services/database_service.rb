@@ -196,23 +196,23 @@ class DatabaseService
 
     tmdb_ids = people.map { |p| p['id'] }
     sql = <<~SQL
-      WITH new_people (tmdb_id, full_name) AS (
+      WITH new_people (tmdb_person_id, full_name) AS (
         SELECT * FROM unnest(?::int[], ?::text[])
       ),
       ins AS (
-        INSERT INTO people (tmdb_id, full_name)
-        SELECT tmdb_id, full_name FROM new_people
-        ON CONFLICT (tmdb_id) DO NOTHING
-        RETURNING person_id, tmdb_id
+        INSERT INTO people (tmdb_person_id, full_name)
+        SELECT tmdb_person_id, full_name FROM new_people
+        ON CONFLICT (tmdb_person_id) DO NOTHING
+        RETURNING person_id, tmdb_person_id
       )
-      SELECT person_id, tmdb_id FROM ins
+      SELECT person_id, tmdb_person_id FROM ins
       UNION ALL
-      SELECT person_id, tmdb_id FROM people WHERE tmdb_id = ANY(?)
+      SELECT person_id, tmdb_person_id FROM people WHERE tmdb_person_id = ANY(?)
     SQL
     ids_array = Sequel.pg_array(tmdb_ids)
     names_array = Sequel.pg_array(people.map { |p| p['name'] })
     DB[sql, ids_array, names_array, ids_array]
-      .each_with_object({}) { |r, h| h[r[:tmdb_id].to_i] = r[:person_id].to_i }
+      .each_with_object({}) { |r, h| h[r[:tmdb_person_id].to_i] = r[:person_id].to_i }
   end
 
   def link_generic_bulk(link_table, movie_id_col, other_id_col, movie_id, other_ids)
