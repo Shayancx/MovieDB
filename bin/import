@@ -34,7 +34,6 @@ if __FILE__ == $PROGRAM_NAME
     target_dir = movie_directory
   end
 
-  importer = nil
   begin
     puts "\e[36m╔════════════════════════════════════════╗\e[0m"
     puts "\e[36m║    #{label.ljust(30)}║\e[0m"
