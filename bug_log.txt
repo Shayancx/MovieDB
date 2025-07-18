@@ -1,0 +1,968 @@
+[shayan@Void MovieDB]$ bundle exec rspec --format documentation
+
+Randomized with seed 33088
+
+DatabaseService
+  #insert_movie_file
+    inserts a movie file record and returns its ID
+  #bulk_import_associations
+    calls all link methods
+  #insert_movie
+    inserts a movie and returns its ID
+  #update_record
+    updates a record in the specified table
+    logs an error on database failure
+  private methods
+    #get_or_create_generic_bulk
+      returns an array of IDs for the given names
+    #get_or_create_people_bulk
+      returns a map of TMDB IDs to database IDs
+    #link_generic_bulk
+      inserts multiple records into a join table
+
+MovieService
+  .years
+    extracts distinct years in descending order
+    returns integers
+    handles nil release dates
+  .find
+    when movie does not exist
+      returns nil
+    when movie exists
+      loads audio tracks for each file (FAILED - 1)
+      loads cast ordered by billing
+      loads directors
+      loads files with technical details
+      loads subtitles for each file
+      returns movie with basic details
+      loads writers with credit types
+      includes all associations
+  .filtered
+    applies sort order descending
+    applies search filter with case insensitive partial match
+    applies country filter
+    combines multiple filters
+    applies sorting by date
+    applies genre filter
+    applies sorting by runtime
+    applies year filter
+    applies language filter
+    applies sorting by name (default)
+    applies sorting by rating
+    applies franchise filter
+    handles empty search string
+    handles nil filters gracefully (FAILED - 2)
+    applies sort order ascending
+  behaves like a filterable resource
+    filters by search query
+    filters by multiple criteria
+    sorts results
+  .franchises
+    returns ordered franchises
+  .genres
+    handles empty table
+    returns ordered genres
+  .countries
+    returns ordered countries
+  .list
+    includes all joined data
+    returns all movies with associations
+    handles empty database
+  .languages
+    returns ordered languages
+
+MovieExplorer
+  Helper Method Testing
+    #image_url
+      returns correct placeholder for each type
+      returns correct placeholder for missing poster
+      returns correct URL for poster with path
+      handles person type
+      handles backdrop type
+      returns placeholder for nil item
+    #format_runtime
+      handles zero runtime
+      returns N/A for nil
+      formats runtime correctly
+      handles large numbers
+    #format_date
+      returns N/A for nil date
+      formats valid date correctly
+      handles invalid date strings
+    #query_with_page
+      handles empty query parameters
+      handles special characters in params
+      adds page parameter to existing query
+  Route Testing
+    GET /
+      renders home page
+    GET /statistics
+      returns statistics page
+    API endpoints
+      GET /api/person/:id
+        when person exists
+          returns person as JSON
+        when person does not exist
+          behaves like an API error response
+            returns JSON error message
+            returns 404 status
+      GET /api/franchises
+        returns franchises as JSON (FAILED - 3)
+      OPTIONS requests (CORS)
+        returns 204 for OPTIONS request
+        includes CORS headers (FAILED - 4)
+      GET /api/countries
+        returns countries as JSON (FAILED - 5)
+      GET /api/movie/:id
+        when movie does not exist
+          behaves like an API error response
+            returns 404 status
+            returns JSON error message
+        when movie exists
+          returns movie as JSON
+      GET /api/movies
+        returns JSON response
+        behaves like a paginated endpoint
+          respects page parameter
+          returns paginated results
+          respects per_page parameter
+      GET /api/statistics
+        returns statistics as JSON
+      GET /api/genres
+        returns genres as JSON (FAILED - 6)
+      GET /api/languages
+        returns languages as JSON (FAILED - 7)
+    GET /movie/:id
+      handles non-integer ID gracefully
+      when movie exists
+        returns movie detail page
+      when movie does not exist
+        returns 404 page
+    GET /movies
+      passes filters to MovieService
+      handles pagination parameters
+      sets instance variables for view
+      returns HTML response with movies
+  Security and Headers
+    handles malformed requests (FAILED - 8)
+    includes security headers (FAILED - 9)
+  Error Handling
+    handles unexpected exceptions gracefully (FAILED - 10)
+    database connection errors
+      handles connection failures (FAILED - 11)
+    with not_found plugin
+      returns JSON for API routes
+      returns HTML for non-API routes
+
+TmdbClient
+  private methods
+    #retry_with_backoff
+      re-raises error after max attempts
+      retries on specified errors and succeeds
+    #handle_api_response
+      parses JSON for successful responses
+      returns nil on JSON parsing error
+      handles rate limiting by raising a custom error
+      returns nil for other client/server errors
+  #download_image
+    returns nil if directory is not writable
+    creates the destination directory if it does not exist
+    returns nil on download failure
+    downloads and saves the image
+    skips download if file already exists
+    returns nil if api_path is blank
+  #get_movie_details
+    returns nil if movie not found (404)
+    returns movie details on success
+  #search_movie
+    returns an empty array on API error
+    returns search results on success
+
+PersonService
+  performance considerations
+    uses single query for all movies
+    uses single query for person
+  .find
+    edge cases
+      handles person with nil values
+      handles string person_id
+      handles movies with nil release dates
+      handles nil person_id gracefully
+    with database errors
+      handles query errors in movie loading
+      handles connection errors
+    when person does not exist
+      returns nil
+      does not query movies
+    when person exists
+      includes movies array
+      returns person with basic details
+      with movies
+        includes all movie fields
+        loads movies with character names
+        orders movies by release date descending
+      with no movies
+        returns empty movies array
+      with complex filmography
+        handles large filmography
+        maintains order
+    query construction
+      filters movies by person_id
+      selects correct movie fields
+      joins correct tables for movies
+      queries correct person
+
+PrettyLogger
+  .error
+    does not output a message when TUI is active
+    outputs a message when TUI is not active
+    adds the message to the errors array
+  .warn
+    adds the message to the warnings array
+    outputs a message when TUI is not active
+    does not output a message when TUI is active
+  .debug
+    outputs a message when DEBUG env var is set
+    does not output a message when DEBUG env var is not set
+  .info
+    outputs a formatted info message
+  .display_summary
+    clears both arrays after display
+    with both warnings and errors
+      displays both sections
+    with no errors or warnings
+      displays a success message
+    with warnings only
+      displays the warnings section
+    with errors only
+      displays the errors section
+  .success
+    outputs a formatted success message
+
+StatisticsService
+  .summary
+    returns a hash of all statistics
+  private methods
+    .total_runtime_hours
+      returns 0 if total runtime is nil
+      calculates the total runtime in hours
+    .total_movies
+      calculates the total number of movies
+      returns 0 on database error
+    .movies_per_genre
+      returns an array of genre statistics
+      returns an empty array on database error
+    .total_size_gb
+      returns 0 if total size is nil
+      calculates the total size in GB
+    .movies_per_year
+      returns an empty array on database error
+      returns an array of year statistics
+
+TMDBMovieImporter
+  #parse_filename
+    parses name and year correctly
+    parses name, year, and TMDB ID correctly
+    returns nil for invalid formats
+  #enqueue_download
+    posts a download task to the thread pool
+    increments and decrements the pending task counter
+  #process_movie_file
+    handles TMDB lookup failure gracefully
+    activates the TUI and initializes variables
+    does not start if total is zeroive
+  .finishments the count and updates the display
+MediaInfoParserunt at the total
+  private methodse files
+    #normalize_aspect_ratio
+      returns nil for unmapped or invalid ratios
+      maps all expected ratios correctly
+  #valid?s not process any files
+    returns false when media data is nil
+    returns true when media data is validthe thread pool
+  #initialize
+    when mediainfo command is not found
+      is invalid and logs an error
+    with successful mediainfo execution
+      parses JSON output and is valid
+      extracts all properties correctlyts
+    when mediainfo command fails
+      has nil datanot writable: /home/shayan/MovieDB/storage/media/movies/1
+      is invalid
+    with invalid JSON outputmovie details (FAILED - 12)
+      handles parse errors gracefully and is invalid
+  parsing various mediainfo outputsme/shayan/MovieDB/storage/media/movies/1
+    with missing video track
+      handles gracefully with nil values (FAILED - 14)
+    with multiple video tracks
+      uses the first video tracknd eventually succeeds (FAILED - 15)
+
+MovieExplorer API
+  GET /api/movies
+    returns movies from the database
+  GET /api/movie/:id when not found
+    returns 404n empty string when count is zero
+
+Failures:ent
+
+  1) MovieService.find when movie exists loads audio tracks for each file
+     Failure/Error: expect(result[:files].first[:audio_tracks]).to eq(audio_tracks)
+     
+     NoMethodError:
+       undefined method '[]' for nil
+     # ./spec/services/movie_service_spec.rb:320:in 'block (4 levels) in <top (required)>'
+     # ./spec/spec_helper.rb:63:in 'block (3 levels) in <top (required)>'
+     # ./spec/spec_helper.rb:62:in 'block (2 levels) in <top (required)>'
+     # ./vendor/bundle/ruby/3.4.0/gems/webmock-3.25.1/lib/webmock/rspec.rb:39:in 'block (2 levels) in <top (required)>'
+
+  2) MovieService.filtered handles nil filters gracefully
+     Failure/Error: expect { described_class.filtered(nil) }.not_to raise_error
+     
+       expected no Exception, got #<NoMethodError: undefined method '[]' for nil> with backtrace:
+         # ./app/services/movie_service.rb:52:in 'MovieService.filtered'
+         # ./spec/services/movie_service_spec.rb:235:in 'block (4 levels) in <top (required)>'
+         # ./spec/services/movie_service_spec.rb:235:in 'block (3 levels) in <top (required)>'
+         # ./spec/spec_helper.rb:63:in 'block (3 levels) in <top (required)>'
+         # ./spec/spec_helper.rb:62:in 'block (2 levels) in <top (required)>'
+         # ./vendor/bundle/ruby/3.4.0/gems/webmock-3.25.1/lib/webmock/rspec.rb:39:in 'block (2 levels) in <top (required)>'
+     # ./spec/services/movie_service_spec.rb:235:in 'block (3 levels) in <top (required)>'
+     # ./spec/spec_helper.rb:63:in 'block (3 levels) in <top (required)>'
+     # ./spec/spec_helper.rb:62:in 'block (2 levels) in <top (required)>'
+     # ./vendor/bundle/ruby/3.4.0/gems/webmock-3.25.1/lib/webmock/rspec.rb:39:in 'block (2 levels) in <top (required)>'
+
+  3) MovieExplorer Route Testing API endpoints GET /api/franchises returns franchises as JSON
+     Failure/Error: expect(body).to eq(test_data.map(&:stringify_keys))
+     
+     NoMethodError:
+       undefined method 'stringify_keys' for an instance of Hash
+     # ./spec/app_spec.rb:195:in 'Array#map'
+     # ./spec/app_spec.rb:195:in 'block (6 levels) in <top (required)>'
+     # ./spec/spec_helper.rb:63:in 'block (3 levels) in <top (required)>'
+     # ./spec/spec_helper.rb:62:in 'block (2 levels) in <top (required)>'
+     # ./vendor/bundle/ruby/3.4.0/gems/webmock-3.25.1/lib/webmock/rspec.rb:39:in 'block (2 levels) in <top (required)>'
+
+  4) MovieExplorer Route Testing API endpoints OPTIONS requests (CORS) includes CORS headers
+     Failure/Error: DB.fetch(sql, *args).all
+       #<Double "database"> received unexpected message :fetch with ("SELECT\n  m.movie_id, m.movie_name, m.original_title, m.release_date,\n  m.runtime_minutes, m.rating...ge_id = ml.language_id\nWHERE 1=1\n GROUP BY m.movie_id, f.franchise_name ORDER BY m.movie_name ASC")
+     # ./app/services/movie_service.rb:86:in 'MovieService.filtered'
+     # ./app.rb:167:in 'block (3 levels) in <class:MovieExplorer>'
+     # ./vendor/bundle/ruby/3.4.0/gems/roda-3.94.0/lib/roda/request.rb:606:in 'Roda::RodaPlugins::Base::RequestMethods#if_match'
+     # ./vendor/bundle/ruby/3.4.0/gems/roda-3.94.0/lib/roda/request.rb:521:in 'Roda::RodaPlugins::Base::RequestMethods#_verb'
+     # ./vendor/bundle/ruby/3.4.0/gems/roda-3.94.0/lib/roda/request.rb:104:in 'Roda::RodaPlugins::Base::RequestMethods#get'
+     # ./app.rb:166:in 'block (2 levels) in <class:MovieExplorer>'
+     # ./vendor/bundle/ruby/3.4.0/gems/roda-3.94.0/lib/roda/request.rb:606:in 'Roda::RodaPlugins::Base::RequestMethods#if_match'
+     # ./vendor/bundle/ruby/3.4.0/gems/roda-3.94.0/lib/roda/request.rb:241:in 'Roda::RodaPlugins::Base::RequestMethods#on'
+     # ./app.rb:163:in 'block in <class:MovieExplorer>'
+     # ./vendor/bundle/ruby/3.4.0/gems/roda-3.94.0/lib/roda.rb:522:in 'Roda::RodaPlugins::Base::InstanceMethods#_roda_run_main_route'
+     # ./vendor/bundle/ruby/3.4.0/gems/roda-3.94.0/lib/roda.rb:500:in 'block in Roda::RodaPlugins::Base::InstanceMethods#_roda_handle_main_route'
+     # ./vendor/bundle/ruby/3.4.0/gems/roda-3.94.0/lib/roda.rb:498:in 'Kernel#catch'
+     # ./vendor/bundle/ruby/3.4.0/gems/roda-3.94.0/lib/roda.rb:498:in 'Roda::RodaPlugins::Base::InstanceMethods#_roda_handle_main_route'
+     # ./vendor/bundle/ruby/3.4.0/gems/roda-3.94.0/lib/roda/plugins/error_handler.rb:88:in 'Roda::RodaPlugins::ErrorHandler::InstanceMethods#_roda_handle_main_route'
+     # ./vendor/bundle/ruby/3.4.0/gems/roda-3.94.0/lib/roda.rb:384:in 'block in Roda::RodaPlugins::Base::ClassMethods#base_rack_app_callable'
+     # ./vendor/bundle/ruby/3.4.0/gems/roda-3.94.0/lib/roda.rb:53:in 'Roda::RodaPlugins::Base::ClassMethods#call'
+     # ./vendor/bundle/ruby/3.4.0/gems/rack-test-2.2.0/lib/rack/test.rb:360:in 'Rack::Test::Session#process_request'
+     # ./vendor/bundle/ruby/3.4.0/gems/rack-test-2.2.0/lib/rack/test.rb:163:in 'Rack::Test::Session#custom_request'
+     # ./vendor/bundle/ruby/3.4.0/gems/rack-test-2.2.0/lib/rack/test.rb:112:in 'Rack::Test::Session#get'
+     # ./spec/app_spec.rb:252:in 'block (5 levels) in <top (required)>'
+     # ./spec/spec_helper.rb:63:in 'block (3 levels) in <top (required)>'
+     # ./spec/spec_helper.rb:62:in 'block (2 levels) in <top (required)>'
+     # ./vendor/bundle/ruby/3.4.0/gems/webmock-3.25.1/lib/webmock/rspec.rb:39:in 'block (2 levels) in <top (required)>'
+
+  5) MovieExplorer Route Testing API endpoints GET /api/countries returns countries as JSON
+     Failure/Error: expect(body).to eq(test_data.map(&:stringify_keys))
+     
+     NoMethodError:
+       undefined method 'stringify_keys' for an instance of Hash
+     # ./spec/app_spec.rb:195:in 'Array#map'
+     # ./spec/app_spec.rb:195:in 'block (6 levels) in <top (required)>'
+     # ./spec/spec_helper.rb:63:in 'block (3 levels) in <top (required)>'
+     # ./spec/spec_helper.rb:62:in 'block (2 levels) in <top (required)>'
+     # ./vendor/bundle/ruby/3.4.0/gems/webmock-3.25.1/lib/webmock/rspec.rb:39:in 'block (2 levels) in <top (required)>'
+
+  6) MovieExplorer Route Testing API endpoints GET /api/genres returns genres as JSON
+     Failure/Error: expect(body).to eq(test_data.map(&:stringify_keys))
+     
+     NoMethodError:
+       undefined method 'stringify_keys' for an instance of Hash
+     # ./spec/app_spec.rb:195:in 'Array#map'
+     # ./spec/app_spec.rb:195:in 'block (6 levels) in <top (required)>'
+     # ./spec/spec_helper.rb:63:in 'block (3 levels) in <top (required)>'
+     # ./spec/spec_helper.rb:62:in 'block (2 levels) in <top (required)>'
+     # ./vendor/bundle/ruby/3.4.0/gems/webmock-3.25.1/lib/webmock/rspec.rb:39:in 'block (2 levels) in <top (required)>'
+
+  7) MovieExplorer Route Testing API endpoints GET /api/languages returns languages as JSON
+     Failure/Error: expect(body).to eq(test_data.map(&:stringify_keys))
+     
+     NoMethodError:
+       undefined method 'stringify_keys' for an instance of Hash
+     # ./spec/app_spec.rb:195:in 'Array#map'
+     # ./spec/app_spec.rb:195:in 'block (6 levels) in <top (required)>'
+     # ./spec/spec_helper.rb:63:in 'block (3 levels) in <top (required)>'
+     # ./spec/spec_helper.rb:62:in 'block (2 levels) in <top (required)>'
+     # ./vendor/bundle/ruby/3.4.0/gems/webmock-3.25.1/lib/webmock/rspec.rb:39:in 'block (2 levels) in <top (required)>'
+
+  8) MovieExplorer Security and Headers handles malformed requests
+     Failure/Error: get '/movie/"><script>alert(1)</script>'
+     
+     URI::InvalidURIError:
+       bad URI (is not URI?): "/movie/\"><script>alert(1)</script>"
+     # ./vendor/bundle/ruby/3.4.0/gems/rack-test-2.2.0/lib/rack/test.rb:272:in 'Rack::Test::Session#parse_uri'
+     # ./vendor/bundle/ruby/3.4.0/gems/rack-test-2.2.0/lib/rack/test.rb:161:in 'Rack::Test::Session#custom_request'
+     # ./vendor/bundle/ruby/3.4.0/gems/rack-test-2.2.0/lib/rack/test.rb:112:in 'Rack::Test::Session#get'
+     # ./spec/app_spec.rb:405:in 'block (3 levels) in <top (required)>'
+     # ./spec/spec_helper.rb:63:in 'block (3 levels) in <top (required)>'
+     # ./spec/spec_helper.rb:62:in 'block (2 levels) in <top (required)>'
+     # ./vendor/bundle/ruby/3.4.0/gems/webmock-3.25.1/lib/webmock/rspec.rb:39:in 'block (2 levels) in <top (required)>'
+
+  9) MovieExplorer Security and Headers includes security headers
+     Failure/Error: DB.fetch(sql, *args).all
+       #<Double "database"> received unexpected message :fetch with ("SELECT\n  m.movie_id, m.movie_name, m.original_title, m.release_date,\n  m.runtime_minutes, m.rating...ge_id = ml.language_id\nWHERE 1=1\n GROUP BY m.movie_id, f.franchise_name ORDER BY m.movie_name ASC")
+     # ./app/services/movie_service.rb:86:in 'MovieService.filtered'
+     # ./app.rb:167:in 'block (3 levels) in <class:MovieExplorer>'
+     # ./vendor/bundle/ruby/3.4.0/gems/roda-3.94.0/lib/roda/request.rb:606:in 'Roda::RodaPlugins::Base::RequestMethods#if_match'
+     # ./vendor/bundle/ruby/3.4.0/gems/roda-3.94.0/lib/roda/request.rb:521:in 'Roda::RodaPlugins::Base::RequestMethods#_verb'
+     # ./vendor/bundle/ruby/3.4.0/gems/roda-3.94.0/lib/roda/request.rb:104:in 'Roda::RodaPlugins::Base::RequestMethods#get'
+     # ./app.rb:166:in 'block (2 levels) in <class:MovieExplorer>'
+     # ./vendor/bundle/ruby/3.4.0/gems/roda-3.94.0/lib/roda/request.rb:606:in 'Roda::RodaPlugins::Base::RequestMethods#if_match'
+     # ./vendor/bundle/ruby/3.4.0/gems/roda-3.94.0/lib/roda/request.rb:241:in 'Roda::RodaPlugins::Base::RequestMethods#on'
+     # ./app.rb:163:in 'block in <class:MovieExplorer>'
+     # ./vendor/bundle/ruby/3.4.0/gems/roda-3.94.0/lib/roda.rb:522:in 'Roda::RodaPlugins::Base::InstanceMethods#_roda_run_main_route'
+     # ./vendor/bundle/ruby/3.4.0/gems/roda-3.94.0/lib/roda.rb:500:in 'block in Roda::RodaPlugins::Base::InstanceMethods#_roda_handle_main_route'
+     # ./vendor/bundle/ruby/3.4.0/gems/roda-3.94.0/lib/roda.rb:498:in 'Kernel#catch'
+     # ./vendor/bundle/ruby/3.4.0/gems/roda-3.94.0/lib/roda.rb:498:in 'Roda::RodaPlugins::Base::InstanceMethods#_roda_handle_main_route'
+     # ./vendor/bundle/ruby/3.4.0/gems/roda-3.94.0/lib/roda/plugins/error_handler.rb:88:in 'Roda::RodaPlugins::ErrorHandler::InstanceMethods#_roda_handle_main_route'
+     # ./vendor/bundle/ruby/3.4.0/gems/roda-3.94.0/lib/roda.rb:384:in 'block in Roda::RodaPlugins::Base::ClassMethods#base_rack_app_callable'
+     # ./vendor/bundle/ruby/3.4.0/gems/roda-3.94.0/lib/roda.rb:53:in 'Roda::RodaPlugins::Base::ClassMethods#call'
+     # ./vendor/bundle/ruby/3.4.0/gems/rack-test-2.2.0/lib/rack/test.rb:360:in 'Rack::Test::Session#process_request'
+     # ./vendor/bundle/ruby/3.4.0/gems/rack-test-2.2.0/lib/rack/test.rb:163:in 'Rack::Test::Session#custom_request'
+     # ./vendor/bundle/ruby/3.4.0/gems/rack-test-2.2.0/lib/rack/test.rb:112:in 'Rack::Test::Session#get'
+     # ./spec/app_spec.rb:399:in 'block (3 levels) in <top (required)>'
+     # ./spec/spec_helper.rb:63:in 'block (3 levels) in <top (required)>'
+     # ./spec/spec_helper.rb:62:in 'block (2 levels) in <top (required)>'
+     # ./vendor/bundle/ruby/3.4.0/gems/webmock-3.25.1/lib/webmock/rspec.rb:39:in 'block (2 levels) in <top (required)>'
+
+  10) MovieExplorer Error Handling handles unexpected exceptions gracefully
+      Failure/Error: expect { get '/movies' }.to raise_error(StandardError)
+        expected StandardError but nothing was raised
+      # ./spec/app_spec.rb:367:in 'block (3 levels) in <top (required)>'
+      # ./spec/spec_helper.rb:63:in 'block (3 levels) in <top (required)>'
+      # ./spec/spec_helper.rb:62:in 'block (2 levels) in <top (required)>'
+      # ./vendor/bundle/ruby/3.4.0/gems/webmock-3.25.1/lib/webmock/rspec.rb:39:in 'block (2 levels) in <top (required)>'
+
+  11) MovieExplorer Error Handling database connection errors handles connection failures
+      Failure/Error: expect { get '/api/movies' }.to raise_error(Sequel::DatabaseConnectionError)
+        expected Sequel::DatabaseConnectionError but nothing was raised
+      # ./spec/app_spec.rb:392:in 'block (4 levels) in <top (required)>'
+      # ./spec/spec_helper.rb:63:in 'block (3 levels) in <top (required)>'
+      # ./spec/spec_helper.rb:62:in 'block (2 levels) in <top (required)>'
+      # ./vendor/bundle/ruby/3.4.0/gems/webmock-3.25.1/lib/webmock/rspec.rb:39:in 'block (2 levels) in <top (required)>'
+
+  12) TmdbClient get_movie_details fetches movie details
+      Failure/Error: response = @http.request(request)
+      
+      WebMock::NetConnectNotAllowedError:
+        Real HTTP connections are disabled. Unregistered request: GET https://api.themoviedb.org/3/movie/1?api_key=test_key&append_to_response=credits,release_dates,images with headers {'Accept'=>'*/*', 'Accept-Encoding'=>'gzip;q=1.0,deflate;q=0.6,identity;q=0.3', 'Host'=>'api.themoviedb.org', 'User-Agent'=>'Ruby'}
+      
+        You can stub this request with the following snippet:
+      
+        stub_request(:get, "https://api.themoviedb.org/3/movie/1?api_key=test_key&append_to_response=credits,release_dates,images").
+          with(
+            headers: {
+        	  'Accept'=>'*/*',
+        	  'Accept-Encoding'=>'gzip;q=1.0,deflate;q=0.6,identity;q=0.3',
+        	  'Host'=>'api.themoviedb.org',
+        	  'User-Agent'=>'Ruby'
+            }).
+          to_return(status: 200, body: "", headers: {})
+      
+        registered request stubs:
+      
+        stub_request(:get, "https://api.themoviedb.org/3/movie/1 with query params hash_including({"api_key" => "testkey", "append_to_response" => "credits,release_dates,images"})")
+        stub_request(:get, "https://api.themoviedb.org/3/search/movie with query params hash_including({"api_key" => "testkey", "query" => "Inception", "year" => "2010"})")
+      
+        ============================================================
+      # ./vendor/bundle/ruby/3.4.0/gems/webmock-3.25.1/lib/webmock/http_lib_adapters/net_http.rb:120:in 'Net::HTTP#request'
+      # ./app/services/tmdb_client.rb:77:in 'block in TmdbClient#make_api_request'
+      # ./app/services/tmdb_client.rb:123:in 'TmdbClient#retry_with_backoff'
+      # ./app/services/tmdb_client.rb:74:in 'TmdbClient#make_api_request'
+      # ./app/services/tmdb_client.rb:36:in 'TmdbClient#get_movie_details'
+      # ./spec/importer/tmdb_client_spec.rb:30:in 'block (2 levels) in <top (required)>'
+      # ./spec/spec_helper.rb:63:in 'block (3 levels) in <top (required)>'
+      # ./spec/spec_helper.rb:62:in 'block (2 levels) in <top (required)>'
+      # ./vendor/bundle/ruby/3.4.0/gems/webmock-3.25.1/lib/webmock/rspec.rb:39:in 'block (2 levels) in <top (required)>'
+
+  13) TmdbClient downloads image and returns relative path
+      Failure/Error: expect(path).to eq('movies/1/poster.jpg')
+      
+        expected: "movies/1/poster.jpg"
+             got: nil
+      
+        (compared using ==)
+      # ./spec/importer/tmdb_client_spec.rb:42:in 'block (2 levels) in <top (required)>'
+      # ./spec/spec_helper.rb:63:in 'block (3 levels) in <top (required)>'
+      # ./spec/spec_helper.rb:62:in 'block (2 levels) in <top (required)>'
+      # ./vendor/bundle/ruby/3.4.0/gems/webmock-3.25.1/lib/webmock/rspec.rb:39:in 'block (2 levels) in <top (required)>'
+
+  14) TmdbClient search_movie fetches results from TMDB
+      Failure/Error: response = @http.request(request)
+      
+      WebMock::NetConnectNotAllowedError:
+        Real HTTP connections are disabled. Unregistered request: GET https://api.themoviedb.org/3/search/movie?api_key=test_key&query=Inception&year=2010 with headers {'Accept'=>'*/*', 'Accept-Encoding'=>'gzip;q=1.0,deflate;q=0.6,identity;q=0.3', 'Host'=>'api.themoviedb.org', 'User-Agent'=>'Ruby'}
+      
+        You can stub this request with the following snippet:
+      
+        stub_request(:get, "https://api.themoviedb.org/3/search/movie?api_key=test_key&query=Inception&year=2010").
+          with(
+            headers: {
+        	  'Accept'=>'*/*',
+        	  'Accept-Encoding'=>'gzip;q=1.0,deflate;q=0.6,identity;q=0.3',
+        	  'Host'=>'api.themoviedb.org',
+        	  'User-Agent'=>'Ruby'
+            }).
+          to_return(status: 200, body: "", headers: {})
+      
+        registered request stubs:
+      
+        stub_request(:get, "https://api.themoviedb.org/3/search/movie with query params hash_including({"api_key" => "testkey", "query" => "Inception", "year" => "2010"})")
+      
+        ============================================================
+      # ./vendor/bundle/ruby/3.4.0/gems/webmock-3.25.1/lib/webmock/http_lib_adapters/net_http.rb:120:in 'Net::HTTP#request'
+      # ./app/services/tmdb_client.rb:77:in 'block in TmdbClient#make_api_request'
+      # ./app/services/tmdb_client.rb:123:in 'TmdbClient#retry_with_backoff'
+      # ./app/services/tmdb_client.rb:74:in 'TmdbClient#make_api_request'
+      # ./app/services/tmdb_client.rb:30:in 'TmdbClient#search_movie'
+      # ./spec/importer/tmdb_client_spec.rb:19:in 'block (2 levels) in <top (required)>'
+      # ./spec/spec_helper.rb:63:in 'block (3 levels) in <top (required)>'
+      # ./spec/spec_helper.rb:62:in 'block (2 levels) in <top (required)>'
+      # ./vendor/bundle/ruby/3.4.0/gems/webmock-3.25.1/lib/webmock/rspec.rb:39:in 'block (2 levels) in <top (required)>'
+
+  15) TmdbClient#make_api_request retries on network timeout and eventually succeeds
+      Failure/Error:
+          def make_api_request(path, params = {})
+            retry_with_backoff do
+              uri = build_uri(path, params)
+              request = Net::HTTP::Get.new(uri)
+              response = @http.request(request)
+        
+              handle_api_response(response)
+            end
+          rescue RateLimitError, Net::OpenTimeout, Net::ReadTimeout, Errno::ECONNRESET
+            # This block will be entered on retryable errors, but the retry is handled by retry_with_backoff.
+      
+      ArgumentError:
+        wrong number of arguments (given 3, expected 1..2)
+      # ./app/services/tmdb_client.rb:73:in 'make_api_request'
+      # ./spec/importer/tmdb_client_spec.rb:86:in 'block (3 levels) in <top (required)>'
+      # ./spec/spec_helper.rb:63:in 'block (3 levels) in <top (required)>'
+      # ./spec/spec_helper.rb:62:in 'block (2 levels) in <top (required)>'
+      # ./vendor/bundle/ruby/3.4.0/gems/webmock-3.25.1/lib/webmock/rspec.rb:39:in 'block (2 levels) in <top (required)>'
+
+  16) TmdbClient#make_api_request retries when rate limited
+      Failure/Error: response = @http.request(request)
+      
+      WebMock::NetConnectNotAllowedError:
+        Real HTTP connections are disabled. Unregistered request: GET https://api.themoviedb.org/3/test?api_key=test_key with headers {'Accept'=>'*/*', 'Accept-Encoding'=>'gzip;q=1.0,deflate;q=0.6,identity;q=0.3', 'Host'=>'api.themoviedb.org', 'User-Agent'=>'Ruby'}
+      
+        You can stub this request with the following snippet:
+      
+        stub_request(:get, "https://api.themoviedb.org/3/test?api_key=test_key").
+          with(
+            headers: {
+        	  'Accept'=>'*/*',
+        	  'Accept-Encoding'=>'gzip;q=1.0,deflate;q=0.6,identity;q=0.3',
+        	  'Host'=>'api.themoviedb.org',
+        	  'User-Agent'=>'Ruby'
+            }).
+          to_return(status: 200, body: "", headers: {})
+      
+        registered request stubs:
+      
+        stub_request(:get, "https://api.themoviedb.org/3/test with query params hash_including({"api_key" => "testkey"})")
+        stub_request(:get, "https://api.themoviedb.org/3/search/movie with query params hash_including({"api_key" => "testkey", "query" => "Inception", "year" => "2010"})")
+      
+        ============================================================
+      # ./vendor/bundle/ruby/3.4.0/gems/webmock-3.25.1/lib/webmock/http_lib_adapters/net_http.rb:120:in 'Net::HTTP#request'
+      # ./app/services/tmdb_client.rb:77:in 'block in TmdbClient#make_api_request'
+      # ./app/services/tmdb_client.rb:123:in 'TmdbClient#retry_with_backoff'
+      # ./app/services/tmdb_client.rb:74:in 'TmdbClient#make_api_request'
+      # ./spec/importer/tmdb_client_spec.rb:72:in 'block (3 levels) in <top (required)>'
+      # ./spec/spec_helper.rb:63:in 'block (3 levels) in <top (required)>'
+      # ./spec/spec_helper.rb:62:in 'block (2 levels) in <top (required)>'
+      # ./vendor/bundle/ruby/3.4.0/gems/webmock-3.25.1/lib/webmock/rspec.rb:39:in 'block (2 levels) in <top (required)>'
+
+Finished in 1.9 seconds (files took 0.38413 seconds to load)
+204 examples, 16 failures
+
+Failed examples:
+
+rspec ./spec/services/movie_service_spec.rb:311 # MovieService.find when movie exists loads audio tracks for each file
+rspec ./spec/services/movie_service_spec.rb:234 # MovieService.filtered handles nil filters gracefully
+rspec ./spec/app_spec.rb[1:1:5:6:1] # MovieExplorer Route Testing API endpoints GET /api/franchises returns franchises as JSON
+rspec ./spec/app_spec.rb:251 # MovieExplorer Route Testing API endpoints OPTIONS requests (CORS) includes CORS headers
+rspec ./spec/app_spec.rb[1:1:5:4:1] # MovieExplorer Route Testing API endpoints GET /api/countries returns countries as JSON
+rspec ./spec/app_spec.rb[1:1:5:3:1] # MovieExplorer Route Testing API endpoints GET /api/genres returns genres as JSON
+rspec ./spec/app_spec.rb[1:1:5:5:1] # MovieExplorer Route Testing API endpoints GET /api/languages returns languages as JSON
+rspec ./spec/app_spec.rb:404 # MovieExplorer Security and Headers handles malformed requests
+rspec ./spec/app_spec.rb:398 # MovieExplorer Security and Headers includes security headers
+rspec ./spec/app_spec.rb:361 # MovieExplorer Error Handling handles unexpected exceptions gracefully
+rspec ./spec/app_spec.rb:388 # MovieExplorer Error Handling database connection errors handles connection failures
+rspec ./spec/importer/tmdb_client_spec.rb:23 # TmdbClient get_movie_details fetches movie details
+rspec ./spec/importer/tmdb_client_spec.rb:34 # TmdbClient downloads image and returns relative path
+rspec ./spec/importer/tmdb_client_spec.rb:17 # TmdbClient search_movie fetches results from TMDB
+rspec ./spec/importer/tmdb_client_spec.rb:76 # TmdbClient#make_api_request retries on network timeout and eventually succeeds
+rspec ./spec/importer/tmdb_client_spec.rb:63 # TmdbClient#make_api_request retries when rate limited
+
+Randomized with seed 33088
+
+Coverage report generated for RSpec to /home/shayan/MovieDB/coverage.
+Line Coverage: 67.41% (544 / 807)
+Stopped processing SimpleCov as a previous error not related to SimpleCov has been detected
+[shayan@Void MovieDB]$ 
+
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+
+  
+  
+  
+  
+[shayan@Void MovieDB]$ TMDB_API_KEY=eb0e30eac4bf856683dbde0853e35bbb bin/import_debug '/run/media/shayan/F7D5-D903/Movies'
+[INFO] Using TMDB API Key: eb0e30...
+╔════════════════════════════════════════╗
+║    TMDB Movie Importer (DEBUG)        ║
+╚════════════════════════════════════════╝
+
+Importing from:   /run/media/shayan/F7D5-D903/Movies
+Media storage:    /home/shayan/MovieDB/storage/media
+Background Threads: 5
+Debug Mode: ENABLED
+
+[INFO] Scan Complete: Found 138 movie files.
+  Processing [                              ] 3/138 2% - ETA: 0m 20s
+  └─ Currently: A Bug's Life (1998).mkv
+[DEBUG] /home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/adapters/postgres.rb:171:in 'PG::Connection#exec'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/adapters/postgres.rb:171:in 'block in Sequel::Postgres::Adapter#execute_query'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/database/logging.rb:38:in 'Sequel::Database#log_connection_yield'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/adapters/postgres.rb:171:in 'Sequel::Postgres::Adapter#execute_query'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/adapters/postgres.rb:159:in 'block in Sequel::Postgres::Adapter#execute'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/adapters/postgres.rb:136:in 'Sequel::Postgres::Adapter#check_disconnect_errors'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/adapters/postgres.rb:159:in 'Sequel::Postgres::Adapter#execute'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/adapters/postgres.rb:532:in 'Sequel::Postgres::Database#_execute'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/adapters/postgres.rb:348:in 'block (2 levels) in Sequel::Postgres::Database#execute'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/adapters/postgres.rb:555:in 'Sequel::Postgres::Database#check_database_errors'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/adapters/postgres.rb:348:in 'block in Sequel::Postgres::Database#execute'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/connection_pool/timed_queue.rb:85:in 'Sequel::TimedQueueConnectionPool#hold'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/database/connecting.rb:283:in 'Sequel::Database#synchronize'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/adapters/postgres.rb:348:in 'Sequel::Postgres::Database#execute'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/database/query.rb:50:in 'Sequel::Database#execute_dui'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/dataset/actions.rb:1208:in 'Sequel::Dataset#execute_dui'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/dataset/actions.rb:1080:in 'block (2 levels) in Sequel::Dataset#_import'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/dataset/actions.rb:1080:in 'Array#each'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/dataset/actions.rb:1080:in 'block in Sequel::Dataset#_import'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/database/transactions.rb:199:in 'block in Sequel::Database#transaction'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/connection_pool/timed_queue.rb:90:in 'Sequel::TimedQueueConnectionPool#hold'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/database/connecting.rb:283:in 'Sequel::Database#synchronize'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/database/transactions.rb:197:in 'Sequel::Database#transaction'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/dataset/actions.rb:1128:in 'Sequel::Dataset#_import_transaction'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/dataset/actions.rb:1080:in 'Sequel::Dataset#_import'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/adapters/shared/postgres.rb:2461:in 'Sequel::Postgres::DatasetMethods#_import'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/dataset/actions.rb:386:in 'Sequel::Dataset#import'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/dataset/actions.rb:566:in 'Sequel::Dataset#multi_insert'
+/home/shayan/MovieDB/app/services/database_service.rb:116:in 'DatabaseService#link_cast_bulk'
+/home/shayan/MovieDB/app/services/database_service.rb:70:in 'DatabaseService#bulk_import_associations'
+/home/shayan/MovieDB/app/services/tmdb_movie_importer.rb:106:in 'TMDBMovieImporter#import_movie'
+/home/shayan/MovieDB/app/services/tmdb_movie_importer.rb:95:in 'TMDBMovieImporter#process_movie_file'
+/home/shayan/MovieDB/app/services/tmdb_movie_importer.rb:75:in 'block in TMDBMovieImporter#process_files'
+/home/shayan/MovieDB/app/services/tmdb_movie_importer.rb:75:in 'Array#each'
+/home/shayan/MovieDB/app/services/tmdb_movie_importer.rb:75:in 'TMDBMovieImporter#process_files'
+/home/shayan/MovieDB/app/services/tmdb_movie_importer.rb:42:in 'TMDBMovieImporter#imp  Processing [                              ] 4/138 2% - ETA: 0m 29s
+  └─ Currently: A Clockwork Orange (1971).mkv
+[DEBUG] /home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/adapters/postgres.rb:171:in 'PG::Connection#exec'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/adapters/postgres.rb:171:in 'block in Sequel::Postgres::Adapter#execute_query'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/database/logging.rb:38:in 'Sequel::Database#log_connection_yield'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/adapters/postgres.rb:171:in 'Sequel::Postgres::Adapter#execute_query'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/adapters/postgres.rb:159:in 'block in Sequel::Postgres::Adapter#execute'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/adapters/postgres.rb:136:in 'Sequel::Postgres::Adapter#check_disconnect_errors'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/adapters/postgres.rb:159:in 'Sequel::Postgres::Adapter#execute'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/adapters/postgres.rb:532:in 'Sequel::Postgres::Database#_execute'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/adapters/postgres.rb:348:in 'block (2 levels) in Sequel::Postgres::Database#execute'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/adapters/postgres.rb:555:in 'Sequel::Postgres::Database#check_database_errors'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/adapters/postgres.rb:348:in 'block in Sequel::Postgres::Database#execute'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/connection_pool/timed_queue.rb:85:in 'Sequel::TimedQueueConnectionPool#hold'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/database/connecting.rb:283:in 'Sequel::Database#synchronize'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/adapters/postgres.rb:348:in 'Sequel::Postgres::Database#execute'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/database/query.rb:50:in 'Sequel::Database#execute_dui'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/dataset/actions.rb:1208:in 'Sequel::Dataset#execute_dui'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/dataset/actions.rb:1080:in 'block (2 levels) in Sequel::Dataset#_import'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/dataset/actions.rb:1080:in 'Array#each'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/dataset/actions.rb:1080:in 'block in Sequel::Dataset#_import'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/database/transactions.rb:199:in 'block in Sequel::Database#transaction'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/connection_pool/timed_queue.rb:90:in 'Sequel::TimedQueueConnectionPool#hold'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/database/connecting.rb:283:in 'Sequel::Database#synchronize'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/database/transactions.rb:197:in 'Sequel::Database#transaction'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/dataset/actions.rb:1128:in 'Sequel::Dataset#_import_transaction'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/dataset/actions.rb:1080:in 'Sequel::Dataset#_import'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/adapters/shared/postgres.rb:2461:in 'Sequel::Postgres::DatasetMethods#_import'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/dataset/actions.rb:386:in 'Sequel::Dataset#import'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/dataset/actions.rb:566:in 'Sequel::Dataset#multi_insert'
+/home/shayan/MovieDB/app/services/database_service.rb:116:in 'DatabaseService#link_cast_bulk'
+/home/shayan/MovieDB/app/services/database_service.rb:70:in 'DatabaseService#bulk_import_associations'
+/home/shayan/MovieDB/app/services/tmdb_movie_importer.rb:106:in 'TMDBMovieImporter#import_movie'
+/home/shayan/MovieDB/app/services/tmdb_movie_importer.rb:95:in 'TMDBMovieImporter#process_movie_file'
+/home/shayan/MovieDB/app/services/tmdb_movie_importer.rb:75:in 'block in TMDBMovieImporter#process_files'
+/home/shayan/MovieDB/app/services/tmdb_movie_importer.rb:75:in 'Array#each'
+/home/shayan/MovieDB/app/services/tmdb_movie_importer.rb:75:in 'TMDBMovieImporter#process_files'
+/home/shayan/MovieDB/app/services/tmdb_movie_importer.rb:42:in 'TMDBMovieImporter#imp  Processing [█                             ] 6/138 4% - ETA: 0m 31s
+  └─ Currently: American Beauty (1999).mkv
+[DEBUG] /home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/adapters/postgres.rb:171:in 'PG::Connection#exec'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/adapters/postgres.rb:171:in 'block in Sequel::Postgres::Adapter#execute_query'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/database/logging.rb:38:in 'Sequel::Database#log_connection_yield'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/adapters/postgres.rb:171:in 'Sequel::Postgres::Adapter#execute_query'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/adapters/postgres.rb:159:in 'block in Sequel::Postgres::Adapter#execute'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/adapters/postgres.rb:136:in 'Sequel::Postgres::Adapter#check_disconnect_errors'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/adapters/postgres.rb:159:in 'Sequel::Postgres::Adapter#execute'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/adapters/postgres.rb:532:in 'Sequel::Postgres::Database#_execute'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/adapters/postgres.rb:348:in 'block (2 levels) in Sequel::Postgres::Database#execute'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/adapters/postgres.rb:555:in 'Sequel::Postgres::Database#check_database_errors'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/adapters/postgres.rb:348:in 'block in Sequel::Postgres::Database#execute'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/connection_pool/timed_queue.rb:85:in 'Sequel::TimedQueueConnectionPool#hold'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/database/connecting.rb:283:in 'Sequel::Database#synchronize'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/adapters/postgres.rb:348:in 'Sequel::Postgres::Database#execute'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/database/query.rb:50:in 'Sequel::Database#execute_dui'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/dataset/actions.rb:1208:in 'Sequel::Dataset#execute_dui'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/dataset/actions.rb:1080:in 'block (2 levels) in Sequel::Dataset#_import'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/dataset/actions.rb:1080:in 'Array#each'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/dataset/actions.rb:1080:in 'block in Sequel::Dataset#_import'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/database/transactions.rb:199:in 'block in Sequel::Database#transaction'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/connection_pool/timed_queue.rb:90:in 'Sequel::TimedQueueConnectionPool#hold'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/database/connecting.rb:283:in 'Sequel::Database#synchronize'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/database/transactions.rb:197:in 'Sequel::Database#transaction'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/dataset/actions.rb:1128:in 'Sequel::Dataset#_import_transaction'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/dataset/actions.rb:1080:in 'Sequel::Dataset#_import'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/adapters/shared/postgres.rb:2461:in 'Sequel::Postgres::DatasetMethods#_import'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/dataset/actions.rb:386:in 'Sequel::Dataset#import'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/dataset/actions.rb:566:in 'Sequel::Dataset#multi_insert'
+/home/shayan/MovieDB/app/services/database_service.rb:116:in 'DatabaseService#link_cast_bulk'
+/home/shayan/MovieDB/app/services/database_service.rb:70:in 'DatabaseService#bulk_import_associations'
+/home/shayan/MovieDB/app/services/tmdb_movie_importer.rb:106:in 'TMDBMovieImporter#import_movie'
+/home/shayan/MovieDB/app/services/tmdb_movie_importer.rb:95:in 'TMDBMovieImporter#process_movie_file'
+/home/shayan/MovieDB/app/services/tmdb_movie_importer.rb:75:in 'block in TMDBMovieImporter#process_files'
+/home/shayan/MovieDB/app/services/tmdb_movie_importer.rb:75:in 'Array#each'
+/home/shayan/MovieDB/app/services/tmdb_movie_importer.rb:75:in 'TMDBMovieImporter#process_files'
+/home/shayan/MovieDB/app/services/tmdb_movie_importer.rb:42:in 'TMDBMovieImporter#imp  Processing [██                            ] 10/138 7% - ETA: 0m 31s
+  └─ Currently: Black Swan (2010).mkv
+[DEBUG] /home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/adapters/postgres.rb:171:in 'PG::Connection#exec'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/adapters/postgres.rb:171:in 'block in Sequel::Postgres::Adapter#execute_query'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/database/logging.rb:38:in 'Sequel::Database#log_connection_yield'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/adapters/postgres.rb:171:in 'Sequel::Postgres::Adapter#execute_query'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/adapters/postgres.rb:159:in 'block in Sequel::Postgres::Adapter#execute'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/adapters/postgres.rb:136:in 'Sequel::Postgres::Adapter#check_disconnect_errors'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/adapters/postgres.rb:159:in 'Sequel::Postgres::Adapter#execute'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/adapters/postgres.rb:532:in 'Sequel::Postgres::Database#_execute'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/adapters/postgres.rb:348:in 'block (2 levels) in Sequel::Postgres::Database#execute'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/adapters/postgres.rb:555:in 'Sequel::Postgres::Database#check_database_errors'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/adapters/postgres.rb:348:in 'block in Sequel::Postgres::Database#execute'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/connection_pool/timed_queue.rb:85:in 'Sequel::TimedQueueConnectionPool#hold'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/database/connecting.rb:283:in 'Sequel::Database#synchronize'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/adapters/postgres.rb:348:in 'Sequel::Postgres::Database#execute'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/database/query.rb:50:in 'Sequel::Database#execute_dui'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/dataset/actions.rb:1208:in 'Sequel::Dataset#execute_dui'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/dataset/actions.rb:1080:in 'block (2 levels) in Sequel::Dataset#_import'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/dataset/actions.rb:1080:in 'Array#each'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/dataset/actions.rb:1080:in 'block in Sequel::Dataset#_import'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/database/transactions.rb:199:in 'block in Sequel::Database#transaction'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/connection_pool/timed_queue.rb:90:in 'Sequel::TimedQueueConnectionPool#hold'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/database/connecting.rb:283:in 'Sequel::Database#synchronize'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/database/transactions.rb:197:in 'Sequel::Database#transaction'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/dataset/actions.rb:1128:in 'Sequel::Dataset#_import_transaction'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/dataset/actions.rb:1080:in 'Sequel::Dataset#_import'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/adapters/shared/postgres.rb:2461:in 'Sequel::Postgres::DatasetMethods#_import'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/dataset/actions.rb:386:in 'Sequel::Dataset#import'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/dataset/actions.rb:566:in 'Sequel::Dataset#multi_insert'
+/home/shayan/MovieDB/app/services/database_service.rb:116:in 'DatabaseService#link_cast_bulk'
+/home/shayan/MovieDB/app/services/database_service.rb:70:in 'DatabaseService#bulk_import_associations'
+/home/shayan/MovieDB/app/services/tmdb_movie_importer.rb:106:in 'TMDBMovieImporter#import_movie'
+/home/shayan/MovieDB/app/services/tmdb_movie_importer.rb:95:in 'TMDBMovieImporter#process_movie_file'
+/home/shayan/MovieDB/app/services/tmdb_movie_importer.rb:75:in 'block in TMDBMovieImporter#process_files'
+/home/shayan/MovieDB/app/services/tmdb_movie_importer.rb:75:in 'Array#each'
+/home/shayan/MovieDB/app/services/tmdb_movie_importer.rb:75:in 'TMDBMovieImporter#process_files'
+/home/shayan/MovieDB/app/services/tmdb_movie_importer.rb:42:in 'TMDBMovieImporter#imp  Processing [███                           ] 14/138 10% - ETA: 0m 27s
+  Processing [████                          ] 21/138 15% - ETA: 0m 17s
+  Processing [██████                        ] 29/138 21% - ETA: 0m 11s
+  └─ Currently: Chopping Mall (1986).mkv
+[DEBUG] /home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/adapters/postgres.rb:171:in 'PG::Connection#exec'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/adapters/postgres.rb:171:in 'block in Sequel::Postgres::Adapter#execute_query'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/database/logging.rb:38:in 'Sequel::Database#log_connection_yield'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/adapters/postgres.rb:171:in 'Sequel::Postgres::Adapter#execute_query'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/adapters/postgres.rb:159:in 'block in Sequel::Postgres::Adapter#execute'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/adapters/postgres.rb:136:in 'Sequel::Postgres::Adapter#check_disconnect_errors'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/adapters/postgres.rb:159:in 'Sequel::Postgres::Adapter#execute'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/adapters/postgres.rb:532:in 'Sequel::Postgres::Database#_execute'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/adapters/postgres.rb:348:in 'block (2 levels) in Sequel::Postgres::Database#execute'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/adapters/postgres.rb:555:in 'Sequel::Postgres::Database#check_database_errors'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/adapters/postgres.rb:348:in 'block in Sequel::Postgres::Database#execute'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/connection_pool/timed_queue.rb:85:in 'Sequel::TimedQueueConnectionPool#hold'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/database/connecting.rb:283:in 'Sequel::Database#synchronize'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/adapters/postgres.rb:348:in 'Sequel::Postgres::Database#execute'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/database/query.rb:50:in 'Sequel::Database#execute_dui'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/dataset/actions.rb:1208:in 'Sequel::Dataset#execute_dui'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/dataset/actions.rb:1080:in 'block (2 levels) in Sequel::Dataset#_import'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/dataset/actions.rb:1080:in 'Array#each'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/dataset/actions.rb:1080:in 'block in Sequel::Dataset#_import'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/database/transactions.rb:199:in 'block in Sequel::Database#transaction'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/connection_pool/timed_queue.rb:90:in 'Sequel::TimedQueueConnectionPool#hold'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/database/connecting.rb:283:in 'Sequel::Database#synchronize'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/database/transactions.rb:197:in 'Sequel::Database#transaction'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/dataset/actions.rb:1128:in 'Sequel::Dataset#_import_transaction'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/dataset/actions.rb:1080:in 'Sequel::Dataset#_import'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/adapters/shared/postgres.rb:2461:in 'Sequel::Postgres::DatasetMethods#_import'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/dataset/actions.rb:386:in 'Sequel::Dataset#import'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/dataset/actions.rb:566:in 'Sequel::Dataset#multi_insert'
+/home/shayan/MovieDB/app/services/database_service.rb:116:in 'DatabaseService#link_cast_bulk'
+/home/shayan/MovieDB/app/services/database_service.rb:70:in 'DatabaseService#bulk_import_associations'
+/home/shayan/MovieDB/app/services/tmdb_movie_importer.rb:106:in 'TMDBMovieImporter#import_movie'
+/home/shayan/MovieDB/app/services/tmdb_movie_importer.rb:95:in 'TMDBMovieImporter#process_movie_file'
+/home/shayan/MovieDB/app/services/tmdb_movie_importer.rb:75:in 'block in TMDBMovieImporter#process_files'
+/home/shayan/MovieDB/app/services/tmdb_movie_importer.rb:75:in 'Array#each'
+/home/shayan/MovieDB/app/services/tmdb_movie_importer.rb:75:in 'TMDBMovieImporter#process_files'
+/home/shayan/MovieDB/app/services/tmdb_movie_importer.rb:42:in 'TMDBMovieImporter#imp  Processing [██████                        ] 30/138 21% - ETA: 0m 12s
+  └─ Currently: Chungking Express (1994).mkv
+[DEBUG] /home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/adapters/postgres.rb:171:in 'PG::Connection#exec'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/adapters/postgres.rb:171:in 'block in Sequel::Postgres::Adapter#execute_query'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/database/logging.rb:38:in 'Sequel::Database#log_connection_yield'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/adapters/postgres.rb:171:in 'Sequel::Postgres::Adapter#execute_query'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/adapters/postgres.rb:159:in 'block in Sequel::Postgres::Adapter#execute'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/adapters/postgres.rb:136:in 'Sequel::Postgres::Adapter#check_disconnect_errors'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/adapters/postgres.rb:159:in 'Sequel::Postgres::Adapter#execute'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/adapters/postgres.rb:532:in 'Sequel::Postgres::Database#_execute'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/adapters/postgres.rb:348:in 'block (2 levels) in Sequel::Postgres::Database#execute'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/adapters/postgres.rb:555:in 'Sequel::Postgres::Database#check_database_errors'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/adapters/postgres.rb:348:in 'block in Sequel::Postgres::Database#execute'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/connection_pool/timed_queue.rb:85:in 'Sequel::TimedQueueConnectionPool#hold'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/database/connecting.rb:283:in 'Sequel::Database#synchronize'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/adapters/postgres.rb:348:in 'Sequel::Postgres::Database#execute'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/database/query.rb:50:in 'Sequel::Database#execute_dui'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/dataset/actions.rb:1208:in 'Sequel::Dataset#execute_dui'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/dataset/actions.rb:1080:in 'block (2 levels) in Sequel::Dataset#_import'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/dataset/actions.rb:1080:in 'Array#each'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/dataset/actions.rb:1080:in 'block in Sequel::Dataset#_import'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/database/transactions.rb:199:in 'block in Sequel::Database#transaction'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/connection_pool/timed_queue.rb:90:in 'Sequel::TimedQueueConnectionPool#hold'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/database/connecting.rb:283:in 'Sequel::Database#synchronize'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/database/transactions.rb:197:in 'Sequel::Database#transaction'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/dataset/actions.rb:1128:in 'Sequel::Dataset#_import_transaction'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/dataset/actions.rb:1080:in 'Sequel::Dataset#_import'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/adapters/shared/postgres.rb:2461:in 'Sequel::Postgres::DatasetMethods#_import'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/dataset/actions.rb:386:in 'Sequel::Dataset#import'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/dataset/actions.rb:566:in 'Sequel::Dataset#multi_insert'
+/home/shayan/MovieDB/app/services/database_service.rb:116:in 'DatabaseService#link_cast_bulk'
+/home/shayan/MovieDB/app/services/database_service.rb:70:in 'DatabaseService#bulk_import_associations'
+/home/shayan/MovieDB/app/services/tmdb_movie_importer.rb:106:in 'TMDBMovieImporter#import_movie'
+/home/shayan/MovieDB/app/services/tmdb_movie_importer.rb:95:in 'TMDBMovieImporter#process_movie_file'
+/home/shayan/MovieDB/app/services/tmdb_movie_importer.rb:75:in 'block in TMDBMovieImporter#process_files'
+/home/shayan/MovieDB/app/services/tmdb_movie_importer.rb:75:in 'Array#each'
+/home/shayan/MovieDB/app/services/tmdb_movie_importer.rb:75:in 'TMDBMovieImporter#process_files'
+/home/shayan/MovieDB/app/services/tmdb_movie_importer.rb:42:in 'TMDBMovieImporter#imp  Processing [███████                       ] 33/138 23% - ETA: 0m 13s
+  └─ Currently: Creep 2 (2017).mkv
+[DEBUG] /home/shayan/MovieDB/app/services/database_service.rb:184:in 'DatabaseService#get_or_create_franchise'
+/home/shayan/MovieDB/app/services/database_service.rb:22:in 'DatabaseService#insert_movie'
+/home/shayan/MovieDB/app/services/tmdb_movie_importer.rb:103:in 'TMDBMovieImporter#import_movie'
+/home/shayan/MovieDB/app/services/tmdb_movie_importer.rb:95:in 'TMDBMovieImporter#process_movie_file'
+/home/shayan/MovieDB/app/services/tmdb_movie_importer.rb:75:in 'block in TMDBMovieImporter#process_files'
+/home/shayan/MovieDB/app/services/tmdb_movie_importer.rb:75:in 'Array#each'
+/home/shayan/MovieDB/app/services/tmdb_movie_importer.rb:75:in 'TMDBMovieImporter#process_files'
+/home/shayan/MovieDB/app/services/tmdb_movie_importer.rb:42:in 'TMDBMovieImporter#imp  Processing [███████                       ] 35/138 25% - ETA: 0m 14s
+  └─ Currently: Dead Poets Society (1989).mkv
+[DEBUG] /home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/adapters/postgres.rb:171:in 'PG::Connection#exec'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/adapters/postgres.rb:171:in 'block in Sequel::Postgres::Adapter#execute_query'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/database/logging.rb:38:in 'Sequel::Database#log_connection_yield'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/adapters/postgres.rb:171:in 'Sequel::Postgres::Adapter#execute_query'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/adapters/postgres.rb:159:in 'block in Sequel::Postgres::Adapter#execute'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/adapters/postgres.rb:136:in 'Sequel::Postgres::Adapter#check_disconnect_errors'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/adapters/postgres.rb:159:in 'Sequel::Postgres::Adapter#execute'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/adapters/postgres.rb:532:in 'Sequel::Postgres::Database#_execute'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/adapters/postgres.rb:348:in 'block (2 levels) in Sequel::Postgres::Database#execute'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/adapters/postgres.rb:555:in 'Sequel::Postgres::Database#check_database_errors'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/adapters/postgres.rb:348:in 'block in Sequel::Postgres::Database#execute'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/connection_pool/timed_queue.rb:85:in 'Sequel::TimedQueueConnectionPool#hold'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/database/connecting.rb:283:in 'Sequel::Database#synchronize'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/adapters/postgres.rb:348:in 'Sequel::Postgres::Database#execute'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/database/query.rb:50:in 'Sequel::Database#execute_dui'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/dataset/actions.rb:1208:in 'Sequel::Dataset#execute_dui'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/dataset/actions.rb:1080:in 'block (2 levels) in Sequel::Dataset#_import'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/dataset/actions.rb:1080:in 'Array#each'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/dataset/actions.rb:1080:in 'block in Sequel::Dataset#_import'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/database/transactions.rb:199:in 'block in Sequel::Database#transaction'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/connection_pool/timed_queue.rb:90:in 'Sequel::TimedQueueConnectionPool#hold'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/database/connecting.rb:283:in 'Sequel::Database#synchronize'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/database/transactions.rb:197:in 'Sequel::Database#transaction'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/dataset/actions.rb:1128:in 'Sequel::Dataset#_import_transaction'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/dataset/actions.rb:1080:in 'Sequel::Dataset#_import'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/adapters/shared/postgres.rb:2461:in 'Sequel::Postgres::DatasetMethods#_import'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/dataset/actions.rb:386:in 'Sequel::Dataset#import'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/dataset/actions.rb:566:in 'Sequel::Dataset#multi_insert'
+/home/shayan/MovieDB/app/services/database_service.rb:116:in 'DatabaseService#link_cast_bulk'
+/home/shayan/MovieDB/app/services/database_service.rb:70:in 'DatabaseService#bulk_import_associations'
+/home/shayan/MovieDB/app/services/tmdb_movie_importer.rb:106:in 'TMDBMovieImporter#import_movie'
+/home/shayan/MovieDB/app/services/tmdb_movie_importer.rb:95:in 'TMDBMovieImporter#process_movie_file'
+/home/shayan/MovieDB/app/services/tmdb_movie_importer.rb:75:in 'block in TMDBMovieImporter#process_files'
+/home/shayan/MovieDB/app/services/tmdb_movie_importer.rb:75:in 'Array#each'
+/home/shayan/MovieDB/app/services/tmdb_movie_importer.rb:75:in 'TMDBMovieImporter#process_files'
+/home/shayan/MovieDB/app/services/tmdb_movie_importer.rb:42:in 'TMDBMovieImporter#imp  Processing [████████                      ] 37/138 26% - ETA: 0m 14s
+  └─ Currently: Death Becomes Her (1992).mkv
+[DEBUG] /home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/adapters/postgres.rb:171:in 'PG::Connection#exec'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/adapters/postgres.rb:171:in 'block in Sequel::Postgres::Adapter#execute_query'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/database/logging.rb:38:in 'Sequel::Database#log_connection_yield'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/adapters/postgres.rb:171:in 'Sequel::Postgres::Adapter#execute_query'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/adapters/postgres.rb:159:in 'block in Sequel::Postgres::Adapter#execute'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/adapters/postgres.rb:136:in 'Sequel::Postgres::Adapter#check_disconnect_errors'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/adapters/postgres.rb:159:in 'Sequel::Postgres::Adapter#execute'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/adapters/postgres.rb:532:in 'Sequel::Postgres::Database#_execute'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/adapters/postgres.rb:348:in 'block (2 levels) in Sequel::Postgres::Database#execute'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/adapters/postgres.rb:555:in 'Sequel::Postgres::Database#check_database_errors'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/adapters/postgres.rb:348:in 'block in Sequel::Postgres::Database#execute'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/connection_pool/timed_queue.rb:85:in 'Sequel::TimedQueueConnectionPool#hold'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/database/connecting.rb:283:in 'Sequel::Database#synchronize'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/adapters/postgres.rb:348:in 'Sequel::Postgres::Database#execute'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/database/query.rb:50:in 'Sequel::Database#execute_dui'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/dataset/actions.rb:1208:in 'Sequel::Dataset#execute_dui'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/dataset/actions.rb:1080:in 'block (2 levels) in Sequel::Dataset#_import'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/dataset/actions.rb:1080:in 'Array#each'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/dataset/actions.rb:1080:in 'block in Sequel::Dataset#_import'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/database/transactions.rb:199:in 'block in Sequel::Database#transaction'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/connection_pool/timed_queue.rb:90:in 'Sequel::TimedQueueConnectionPool#hold'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/database/connecting.rb:283:in 'Sequel::Database#synchronize'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/database/transactions.rb:197:in 'Sequel::Database#transaction'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/dataset/actions.rb:1128:in 'Sequel::Dataset#_import_transaction'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/dataset/actions.rb:1080:in 'Sequel::Dataset#_import'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/adapters/shared/postgres.rb:2461:in 'Sequel::Postgres::DatasetMethods#_import'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/dataset/actions.rb:386:in 'Sequel::Dataset#import'
+/home/shayan/.gem/gems/sequel-5.94.0/lib/sequel/dataset/actions.rb:566:in 'Sequel::Dataset#multi_insert'
+/home/shayan/MovieDB/app/services/database_service.rb:116:in 'DatabaseService#link_cast_bulk'
+/home/shayan/MovieDB/app/services/database_service.rb:70:in 'DatabaseService#bulk_import_associations'
+/home/shayan/MovieDB/app/services/tmdb_movie_importer.rb:106:in 'TMDBMovieImporter#import_movie'
+/home/shayan/MovieDB/app/services/tmdb_movie_importer.rb:95:in 'TMDBMovieImporter#process_movie_file'
+/home/shayan/MovieDB/app/services/tmdb_movie_importer.rb:75:in 'block in TMDBMovieImporter#process_files'
+/home/shayan/MovieDB/app/services/tmdb_movie_importer.rb:75:in 'Array#each'
+/home/shayan/MovieDB/app/services/tmdb_movie_importer.rb:75:in 'TMDBMovieImporter#process_files'
+/home/shayan/MovieDB/app/services/tmdb_movie_importer.rb:42:in 'TMDBMovieImporter#imp  Processing [████████                      ] 38/138 27% - ETA: 0m 15s
+  └─ Currently: Der Baader Meinhof Komplex (2008).mkv
+^C
+
+[WARN] Import interrupted by user. Waiting for downloads...
+[INFO] Waiting for background tasks to complete...
+[SUCCESS] All background tasks finished and connections closed.
+[shayan@Void MovieDB]$ ^C
+[shayan@Void MovieDB]$ 
+

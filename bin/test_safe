@@ -1,0 +1,30 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# Safe test runner with thread cleanup
+require 'timeout'
+
+puts "Running RSpec tests with enhanced safety..."
+
+begin
+  pid = Process.spawn("bundle exec rspec --format progress", pgroup: true)
+  
+  Timeout.timeout(300) do # 5 minute timeout
+    Process.wait(pid)
+    exit_status = $?.exitstatus
+    exit(exit_status)
+  end
+rescue Timeout::Error
+  puts "\n\nTests timed out after 5 minutes!"
+  
+  # Kill the entire process group
+  begin
+    Process.kill('-TERM', Process.getpgid(pid))
+    sleep 1
+    Process.kill('-KILL', Process.getpgid(pid)) rescue nil
+  rescue Errno::ESRCH
+    # Process already dead
+  end
+  
+  exit 1
+end

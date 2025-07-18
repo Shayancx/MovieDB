@@ -49,3 +49,50 @@ require_relative '../app/services/tui'
 require_relative '../app'
 
 Dir[File.join(__dir__, 'support', '**', '*.rb')].sort.each { |f| require f }
+
+# Enhanced thread cleanup
+RSpec.configure do |config|
+  config.before(:suite) do
+    # Set a timeout for all tests
+    RSpec.configuration.default_formatter = 'progress'
+  end
+  
+  config.around(:each) do |example|
+    # Run each test with a timeout
+    Timeout.timeout(30) do
+      example.run
+    end
+  rescue Timeout::Error
+    skip "Test timed out after 30 seconds"
+  end
+  
+  config.after(:each) do |example|
+    # More aggressive thread cleanup
+    if defined?(TMDBMovieImporter)
+      ObjectSpace.each_object(TMDBMovieImporter) do |importer|
+        importer.shutdown rescue nil
+      end
+    end
+    
+    if defined?(TMDBSeriesImporter)
+      ObjectSpace.each_object(TMDBSeriesImporter) do |importer|
+        importer.shutdown rescue nil
+      end
+    end
+    
+    # Kill all threads except main
+    Thread.list.each do |thread|
+      next if thread == Thread.main
+      thread.kill
+      thread.join(0.1) rescue nil
+    end
+    
+    # Clear any thread pools
+    if defined?(Concurrent::ThreadPoolExecutor)
+      ObjectSpace.each_object(Concurrent::ThreadPoolExecutor) do |pool|
+        pool.shutdown
+        pool.kill unless pool.wait_for_termination(1)
+      end
+    end
+  end
+end

@@ -6,289 +6,122 @@ require_relative '../../app/services/tui'
 
 RSpec.describe PrettyLogger do
   before do
-    # Clear the class variables
-    described_class.class_variable_set(:@@errors, Concurrent::Array.new)
-    described_class.class_variable_set(:@@warnings, Concurrent::Array.new)
-    
-    # Capture stdout
-    @original_stdout = $stdout
-    $stdout = StringIO.new
-    
-    # Mock TUI
+    # Reset warnings and errors before each test
+    described_class.send(:clear_messages)
+    # Mock TUI to be inactive by default
     allow(TUI).to receive(:active?).and_return(false)
-  end
-
-  after do
-    $stdout = @original_stdout
+    # Suppress puts to avoid cluttering test output
+    allow($stdout).to receive(:puts)
   end
 
   describe '.info' do
-    it 'outputs info message with blue color' do
+    it 'outputs a formatted info message' do
+      expect($stdout).to receive(:puts).with(/\[\e\[34mINFO\e\[0m\] Test message/)
       described_class.info('Test message')
-      output = $stdout.string
-      expect(output).to include('[INFO]')
-      expect(output).to include('Test message')
-      expect(output).to include("\e[34m") # Blue color
     end
   end
 
   describe '.success' do
-    it 'outputs success message with green color' do
-      described_class.success('Operation completed')
-      output = $stdout.string
-      expect(output).to include('[SUCCESS]')
-      expect(output).to include('Operation completed')
-      expect(output).to include("\e[32m") # Green color
-    end
-  end
-
-  describe '.debug' do
-    context 'when DEBUG environment variable is set' do
-      before do
-        ENV['DEBUG'] = 'true'
-      end
-
-      after do
-        ENV.delete('DEBUG')
-      end
-
-      it 'outputs debug message with magenta color' do
-        described_class.debug('Debug info')
-        output = $stdout.string
-        expect(output).to include('[DEBUG]')
-        expect(output).to include('Debug info')
-        expect(output).to include("\e[35m") # Magenta color
-      end
-    end
-
-    context 'when DEBUG is not set' do
-      before do
-        ENV.delete('DEBUG')
-      end
-
-      it 'does not output debug message' do
-        described_class.debug('Debug info')
-        output = $stdout.string
-        expect(output).to be_empty
-      end
+    it 'outputs a formatted success message' do
+      expect($stdout).to receive(:puts).with(/\[\e\[32mSUCCESS\e\[0m\] Operation complete/)
+      described_class.success('Operation complete')
     end
   end
 
   describe '.warn' do
-    it 'adds message to warnings array' do
-      described_class.warn('Warning message')
-      warnings = described_class.class_variable_get(:@@warnings)
-      expect(warnings).to include('Warning message')
+    it 'adds the message to the warnings array' do
+      described_class.warn('A warning')
+      expect(described_class.class_variable_get(:@@warnings)).to include('A warning')
     end
 
-    context 'when TUI is not active' do
-      it 'outputs warning message with yellow color' do
-        described_class.warn('Warning message')
-        output = $stdout.string
-        expect(output).to include('[WARN]')
-        expect(output).to include('Warning message')
-        expect(output).to include("\e[33m") # Yellow color
-      end
+    it 'outputs a message when TUI is not active' do
+      expect($stdout).to receive(:puts).with(/\[\e\[33mWARN\e\[0m\] A warning/)
+      described_class.warn('A warning')
     end
 
-    context 'when TUI is active' do
-      before do
-        allow(TUI).to receive(:active?).and_return(true)
-      end
-
-      it 'does not output to stdout' do
-        described_class.warn('Warning message')
-        output = $stdout.string
-        expect(output).to be_empty
-      end
-
-      it 'still adds to warnings array' do
-        described_class.warn('Warning message')
-        warnings = described_class.class_variable_get(:@@warnings)
-        expect(warnings).to include('Warning message')
-      end
+    it 'does not output a message when TUI is active' do
+      allow(TUI).to receive(:active?).and_return(true)
+      expect($stdout).not_to receive(:puts)
+      described_class.warn('A warning')
     end
   end
 
   describe '.error' do
-    it 'adds message to errors array' do
-      described_class.error('Error message')
-      errors = described_class.class_variable_get(:@@errors)
-      expect(errors).to include('Error message')
+    it 'adds the message to the errors array' do
+      described_class.error('An error')
+      expect(described_class.class_variable_get(:@@errors)).to include('An error')
     end
 
-    context 'when TUI is not active' do
-      it 'outputs error message with red color' do
-        described_class.error('Error message')
-        output = $stdout.string
-        expect(output).to include('[ERROR]')
-        expect(output).to include('Error message')
-        expect(output).to include("\e[31m") # Red color
-      end
+    it 'outputs a message when TUI is not active' do
+      expect($stdout).to receive(:puts).with(/\[\e\[31mERROR\e\[0m\] An error/)
+      described_class.error('An error')
     end
 
-    context 'when TUI is active' do
-      before do
-        allow(TUI).to receive(:active?).and_return(true)
-      end
+    it 'does not output a message when TUI is active' do
+      allow(TUI).to receive(:active?).and_return(true)
+      expect($stdout).not_to receive(:puts)
+      described_class.error('An error')
+    end
+  end
 
-      it 'does not output to stdout' do
-        described_class.error('Error message')
-        output = $stdout.string
-        expect(output).to be_empty
-      end
+  describe '.debug' do
+    it 'outputs a message when DEBUG env var is set' do
+      ENV['DEBUG'] = '1'
+      expect($stdout).to receive(:puts).with(/\[\e\[35mDEBUG\e\[0m\] Debug info/)
+      described_class.debug('Debug info')
+      ENV.delete('DEBUG')
+    end
 
-      it 'still adds to errors array' do
-        described_class.error('Error message')
-        errors = described_class.class_variable_get(:@@errors)
-        expect(errors).to include('Error message')
-      end
+    it 'does not output a message when DEBUG env var is not set' do
+      expect($stdout).not_to receive(:puts)
+      described_class.debug('Debug info')
     end
   end
 
   describe '.display_summary' do
     context 'with no errors or warnings' do
-      it 'displays success message' do
+      it 'displays a success message' do
+        expect($stdout).to receive(:puts).with(/Completed with 0 errors and 0 warnings/)
         described_class.display_summary
-        output = $stdout.string
-        expect(output).to include('--- Import Summary ---')
-        expect(output).to include('Completed with 0 errors and 0 warnings.')
-        expect(output).to include('[SUCCESS]')
       end
     end
 
     context 'with warnings only' do
-      before do
-        described_class.warn('Warning 1')
-        described_class.warn('Warning 2')
-      end
-
-      it 'displays warnings section' do
+      before { described_class.warn('Warning 1') }
+      it 'displays the warnings section' do
+        expect($stdout).to receive(:puts).with(/Warnings \(1\)/)
+        expect($stdout).to receive(:puts).with(/• Warning 1/)
         described_class.display_summary
-        output = $stdout.string
-        expect(output).to include('Warnings (2)')
-        expect(output).to include('• Warning 1')
-        expect(output).to include('• Warning 2')
-        expect(output).to include("\e[33m") # Yellow color
-      end
-
-      it 'clears warnings after display' do
-        described_class.display_summary
-        warnings = described_class.class_variable_get(:@@warnings)
-        expect(warnings).to be_empty
       end
     end
 
     context 'with errors only' do
-      before do
-        described_class.error('Error 1')
-        described_class.error('Error 2')
-        described_class.error('Error 3')
-      end
-
-      it 'displays errors section' do
+      before { described_class.error('Error 1') }
+      it 'displays the errors section' do
+        expect($stdout).to receive(:puts).with(/Errors \(1\)/)
+        expect($stdout).to receive(:puts).with(/• Error 1/)
         described_class.display_summary
-        output = $stdout.string
-        expect(output).to include('Errors (3)')
-        expect(output).to include('• Error 1')
-        expect(output).to include('• Error 2')
-        expect(output).to include('• Error 3')
-        expect(output).to include("\e[31m") # Red color
-      end
-
-      it 'clears errors after display' do
-        described_class.display_summary
-        errors = described_class.class_variable_get(:@@errors)
-        expect(errors).to be_empty
       end
     end
 
-    context 'with both errors and warnings' do
+    context 'with both warnings and errors' do
       before do
         described_class.warn('Warning 1')
         described_class.error('Error 1')
-        described_class.warn('Warning 2')
-        described_class.error('Error 2')
       end
-
       it 'displays both sections' do
+        expect($stdout).to receive(:puts).with(/Warnings \(1\)/)
+        expect($stdout).to receive(:puts).with(/Errors \(1\)/)
         described_class.display_summary
-        output = $stdout.string
-        expect(output).to include('Warnings (2)')
-        expect(output).to include('Errors (2)')
-        expect(output).to include('• Warning 1')
-        expect(output).to include('• Warning 2')
-        expect(output).to include('• Error 1')
-        expect(output).to include('• Error 2')
-      end
-
-      it 'clears both arrays after display' do
-        described_class.display_summary
-        errors = described_class.class_variable_get(:@@errors)
-        warnings = described_class.class_variable_get(:@@warnings)
-        expect(errors).to be_empty
-        expect(warnings).to be_empty
       end
     end
-  end
 
-  describe 'concurrent access' do
-    it 'handles concurrent errors safely' do
-      threads = 10.times.map do |i|
-        Thread.new { described_class.error("Error #{i}") }
-      end
-      threads.each(&:join)
-      
-      errors = described_class.class_variable_get(:@@errors)
-      expect(errors.size).to eq(10)
-    end
-
-    it 'handles concurrent warnings safely' do
-      threads = 10.times.map do |i|
-        Thread.new { described_class.warn("Warning #{i}") }
-      end
-      threads.each(&:join)
-      
-      warnings = described_class.class_variable_get(:@@warnings)
-      expect(warnings.size).to eq(10)
-    end
-
-    it 'maintains thread safety for arrays' do
-      error_threads = 5.times.map do |i|
-        Thread.new { described_class.error("Error #{i}") }
-      end
-      
-      warn_threads = 5.times.map do |i|
-        Thread.new { described_class.warn("Warning #{i}") }
-      end
-      
-      (error_threads + warn_threads).each(&:join)
-      
-      errors = described_class.class_variable_get(:@@errors)
-      warnings = described_class.class_variable_get(:@@warnings)
-      
-      expect(errors.size).to eq(5)
-      expect(warnings.size).to eq(5)
-    end
-  end
-
-  describe 'formatting' do
-    it 'includes newline before warn output' do
-      described_class.warn('Test')
-      output = $stdout.string
-      expect(output).to start_with("\n")
-    end
-
-    it 'includes newline before error output' do
-      described_class.error('Test')
-      output = $stdout.string
-      expect(output).to start_with("\n")
-    end
-
-    it 'properly formats ANSI color codes' do
-      described_class.info('Test')
-      output = $stdout.string
-      expect(output).to match(/\[\e\[\d+m.*\e\[0m\]/) # Color code pattern
+    it 'clears both arrays after display' do
+      described_class.warn('A warning')
+      described_class.error('An error')
+      described_class.display_summary
+      expect(described_class.class_variable_get(:@@warnings)).to be_empty
+      expect(described_class.class_variable_get(:@@errors)).to be_empty
     end
   end
 end

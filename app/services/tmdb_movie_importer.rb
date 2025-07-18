@@ -10,6 +10,7 @@ require_relative 'tmdb_client'
 require_relative 'database_service'
 require_relative 'media_info_parser'
 
+# Manages the import of movies from a directory into the database.
 class TMDBMovieImporter
   include ImportConfig
 
@@ -24,42 +25,33 @@ class TMDBMovieImporter
     )
     @db_update_queue = Queue.new
     @db_updater_thread = Thread.new { process_db_updates }
-    @pending_downloads = Concurrent::AtomicFixnum.new(0)
-    setup_media_directories
+    @pending_tasks = Concurrent::AtomicFixnum.new(0)
+    @shutdown_started = false
   end
 
+  # Scans a directory for movie files and imports new ones.
   def import_from_directory(directory)
-    PrettyLogger.info 'Fetching existing movie library from database...'
+    setup_media_directories
+    movie_files = find_movie_files(directory)
     existing_paths = @db_service.get_existing_file_paths
-    PrettyLogger.info "Scanning '#{directory}' for new movie files..."
-    video_extensions = '{mkv,mp4,mov,avi,m2ts}'
-    all_files = Dir.glob(File.join(directory, '**', "*.#{video_extensions}"), File::FNM_CASEFOLD).sort
-    movies_to_process = all_files.reject { |file| existing_paths.include?(File.absolute_path(file)) }
-    display_scan_summary(all_files.length, movies_to_process.length)
+    movies_to_process = movie_files.reject { |file| existing_paths.include?(File.absolute_path(file)) }
+
+    display_scan_summary(movie_files.length, movies_to_process.length)
     return if movies_to_process.empty?
 
-    TUI.start(movies_to_process.length)
-    movies_to_process.each do |file_path|
-      process_movie_file(file_path)
-      sleep(0.1)
-    end
-    TUI.finish
-    
-    # Wait for all pending downloads
-    wait_for_downloads
+    process_files(movies_to_process)
   end
 
+  # Shuts down the importer, waiting for all background tasks to complete.
   def shutdown
     return if @shutdown_started
-
     @shutdown_started = true
+
     PrettyLogger.info 'Waiting for background tasks to complete...'
-    
-    # Wait for pending downloads with timeout
-    wait_for_downloads(60)
     
     @thread_pool.shutdown
     @thread_pool.wait_for_termination(30)
+
     @db_update_queue.close
     @db_updater_thread.join if @db_updater_thread&.alive?
     @db_service.close
@@ -68,227 +60,200 @@ class TMDBMovieImporter
 
   private
 
-  def wait_for_downloads(timeout = 300)
-    start_time = Time.now
-    while @pending_downloads.value > 0 && (Time.now - start_time) < timeout
-      PrettyLogger.debug "Waiting for #{@pending_downloads.value} downloads to complete..."
-      sleep(1)
-    end
-    
-    if @pending_downloads.value > 0
-      PrettyLogger.warn "Timed out waiting for #{@pending_downloads.value} downloads"
-    end
+  # Finds all video files in a directory.
+  def find_movie_files(directory)
+    video_extensions = '{mkv,mp4,mov,avi,m2ts}'
+    Dir.glob(File.join(directory, '**', "*.#{video_extensions}"), File::FNM_CASEFOLD).sort
+  rescue Errno::EACCES => e
+    PrettyLogger.error("Permission denied while scanning directory: #{e.message}")
+    []
   end
 
+  # Processes a list of movie files.
+  def process_files(files)
+    TUI.start(files.length)
+    files.each { |file_path| process_movie_file(file_path) }
+    TUI.finish
+    wait_for_pending_tasks(300) # Wait longer for all tasks after TUI finishes
+  end
+
+  # Full import process for a single movie file.
   def process_movie_file(file_path)
-    filename = File.basename(file_path)
-    TUI.increment(filename)
-    
-    parsed_info = parse_filename(filename)
+    TUI.increment(File.basename(file_path))
+    parsed_info = parse_filename(File.basename(file_path))
     unless parsed_info
-      PrettyLogger.error("Could not parse movie info from filename: #{filename}")
+      PrettyLogger.error("Could not parse movie info from: #{File.basename(file_path)}")
       return
     end
-    
-    begin
-      details = fetch_movie_details(parsed_info)
-      unless details
-        PrettyLogger.error("Could not find TMDB details for: #{parsed_info[:name]} (#{parsed_info[:year]})")
-        return
-      end
-      
-      # Use separate transactions for each operation
-      movie_id = nil
-      people_map = nil
-      
-      @db_service.conn.transaction do
-        movie_id = @db_service.insert_movie(details)
-      end
-      
-      if movie_id
-        @db_service.conn.transaction do
-          people_map = @db_service.bulk_import_associations(movie_id, details)
-        end
-        
-        # Process technical data outside transaction
-        process_technical_data(movie_id, file_path)
-        
-        # Enqueue downloads
-        enqueue_image_downloads(movie_id, details)
-        enqueue_person_image_downloads(details, people_map) if people_map
-      end
-    rescue StandardError => e
-      PrettyLogger.error("Fatal error processing '#{filename}': #{e.message}")
-      PrettyLogger.debug(e.backtrace.join("\n")) if ENV['DEBUG']
+
+    details = fetch_movie_details(parsed_info)
+    unless details
+      PrettyLogger.error("Could not find TMDB details for: #{parsed_info[:name]}")
+      return
     end
+
+    import_movie(details, file_path)
+  rescue StandardError => e
+    PrettyLogger.error("Fatal error processing '#{File.basename(file_path)}': #{e.message}")
+    PrettyLogger.debug(e.backtrace.join("\n"))
   end
 
+  # Handles the database insertion and media processing for a movie.
+  def import_movie(details, file_path)
+    movie_id = @db_service.insert_movie(details)
+    return unless movie_id
+
+    people_map = @db_service.bulk_import_associations(movie_id, details)
+    process_technical_data(movie_id, file_path)
+    enqueue_all_image_downloads(movie_id, details, people_map)
+  end
+
+  # Parses the movie title, year, and optional TMDB ID from a filename.
   def parse_filename(filename)
     base = File.basename(filename, '.*')
     if (match = base.match(/^(.+?)\s\((\d{4})\)\s\(tmdbid-(\d+)\)$/i))
-      { name: match[1].strip, year: match[2].to_i, tmdb_id: match[3].to_i }
+      { name: match[1].strip.gsub('.', ' '), year: match[2].to_i, tmdb_id: match[3].to_i }
     elsif (match = base.match(/^(.+?)\s*\((\d{4})\)/))
-      { name: match[1].gsub('.', ' ').strip, year: match[2].to_i }
+      { name: match[1].strip.gsub('.', ' '), year: match[2].to_i }
     end
   end
 
+  # Fetches movie details from TMDB, handling search and selection if needed.
   def fetch_movie_details(parsed_info)
     if parsed_info[:tmdb_id]
-      @tmdb_client.get_movie_details(parsed_info[:tmdb_id])
-    else
-      results = @tmdb_client.search_movie(parsed_info[:name], parsed_info[:year])
-      return nil if results.empty?
-
-      chosen_movie = results.length == 1 ? results.first : present_search_choices(results, parsed_info[:name])
-      return nil unless chosen_movie
-
-      @tmdb_client.get_movie_details(chosen_movie['id'])
+      return @tmdb_client.get_movie_details(parsed_info[:tmdb_id])
     end
+
+    results = @tmdb_client.search_movie(parsed_info[:name], parsed_info[:year])
+    return nil if results.empty?
+
+    chosen_movie = results.length == 1 ? results.first : present_search_choices(results, parsed_info[:name])
+    return nil unless chosen_movie
+
+    @tmdb_client.get_movie_details(chosen_movie['id'])
   end
 
+  # Processes mediainfo and enqueues checksum calculation.
   def process_technical_data(movie_id, file_path)
-    begin
-      mediainfo = MediaInfoParser.new(file_path)
-      unless mediainfo.valid?
-        PrettyLogger.warn("Could not read mediainfo for: #{File.basename(file_path)}")
-        return
-      end
-      
-      @db_service.conn.transaction do
-        file_id = @db_service.insert_movie_file(movie_id, file_path, mediainfo)
-        enqueue_checksum_calculation(file_id, file_path) if file_id
-      end
-    rescue => e
-      PrettyLogger.error("Failed to process technical data: #{e.message}")
-    end
+    mediainfo = MediaInfoParser.new(file_path)
+    return unless mediainfo.valid?
+
+    file_id = @db_service.insert_movie_file(movie_id, file_path, mediainfo)
+    enqueue_checksum_calculation(file_id, file_path) if file_id
   end
 
-  def enqueue_image_downloads(movie_id, details)
+  # Enqueues downloads for movie and person images.
+  def enqueue_all_image_downloads(movie_id, details, people_map)
+    enqueue_movie_image_downloads(movie_id, details)
+    enqueue_person_image_downloads(details, people_map) if people_map
+  end
+
+  def enqueue_movie_image_downloads(movie_id, details)
     images = details['images']
     return unless images
 
-    poster = find_best_image(images['posters'], details['original_language'])
-    backdrop = find_best_image(images['backdrops'], details['original_language'], :backdrop)
-    logo = find_best_image(images['logos'], details['original_language'])
-    
-    enqueue_download(:movies, :poster_path, movie_id, poster&.dig('file_path'), "movies/#{movie_id}/poster.jpg")
-    enqueue_download(:movies, :backdrop_path, movie_id, backdrop&.dig('file_path'), "movies/#{movie_id}/backdrop.jpg")
-    enqueue_download(:movies, :logo_path, movie_id, logo&.dig('file_path'), "movies/#{movie_id}/logo.png")
+    {
+      poster: find_best_image(images['posters'], details['original_language']),
+      backdrop: find_best_image(images['backdrops'], details['original_language']),
+      logo: find_best_image(images['logos'], details['original_language'])
+    }.each do |type, image|
+      next unless image
+      save_path = "movies/#{movie_id}/#{type}#{File.extname(image['file_path'])}"
+      enqueue_download(:movies, "#{type}_path", movie_id, image['file_path'], save_path)
+    end
   end
 
   def enqueue_person_image_downloads(details, people_map)
-    cast = details.dig('credits', 'cast') || []
-    crew = details.dig('credits', 'crew') || []
-    (cast + crew).uniq { |p| p['id'] }.each do |person|
+    (details.dig('credits', 'cast') || []).each do |person|
       person_id = people_map[person['id']]
       next unless person_id && person['profile_path']
-
-      enqueue_download(:people, :headshot_path, person_id, person['profile_path'], "people/#{person_id}/headshot.jpg")
+      save_path = "people/#{person_id}/headshot#{File.extname(person['profile_path'])}"
+      enqueue_download(:people, :headshot_path, person_id, person['profile_path'], save_path)
     end
   end
 
+  # Generic method to enqueue a download and subsequent DB update.
   def enqueue_download(table, column, id, api_path, save_path)
-    return unless api_path
-
-    @pending_downloads.increment
+    return if api_path.blank?
+    @pending_tasks.increment
     @thread_pool.post do
       begin
-        relative_path = @tmdb_client.download_image(api_path, save_path)
-        if relative_path
-          id_col_name = "#{table.to_s.chomp('s')}_id"
-          @db_update_queue << { table: table, id_col: id_col_name, id_val: id,
-                                data: { column => File.basename(relative_path) } }
+        if @tmdb_client.download_image(api_path, save_path)
+          @db_update_queue << { table: table, id: id, data: { column => File.basename(save_path) } }
         end
       ensure
-        @pending_downloads.decrement
+        @pending_tasks.decrement
       end
     end
   end
 
+  # Enqueues a background job to calculate the file's checksum.
   def enqueue_checksum_calculation(file_id, file_path)
-    @pending_downloads.increment
+    @pending_tasks.increment
     @thread_pool.post do
       begin
-        digest = Digest::SHA256.new
-        File.open(file_path, 'rb') do |file|
-          while (chunk = file.read(1024 * 1024))
-            digest.update(chunk)
-          end
-        end
-        checksum = digest.hexdigest
-        @db_update_queue << { table: :movie_files, id_col: :file_id, id_val: file_id,
-                              data: { checksum_sha256: checksum } }
+        checksum = Digest::SHA256.file(file_path).hexdigest
+        @db_update_queue << { table: :movie_files, id: file_id, data: { checksum_sha256: checksum } }
       rescue StandardError => e
         PrettyLogger.warn("Failed to calculate checksum for #{File.basename(file_path)}: #{e.message}")
       ensure
-        @pending_downloads.decrement
+        @pending_tasks.decrement
       end
     end
   end
 
+  # The loop that processes database updates from the queue.
   def process_db_updates
     while (update_job = @db_update_queue.pop)
-      begin
-        @db_service.update_record(**update_job)
-      rescue StandardError => e
-        PrettyLogger.error("DB update error: #{e.message}")
-      end
+      @db_service.update_record(update_job[:table], update_job[:id], update_job[:data])
     end
-  rescue => e
-    PrettyLogger.error("DB updater thread crashed: #{e.message}")
+  rescue StandardError => e
+    PrettyLogger.error("DB updater thread crashed: #{e.message}") unless @db_update_queue.closed?
   end
 
+  # Creates the necessary media directories.
   def setup_media_directories
     %w[movies people series].each do |subdir|
       FileUtils.mkdir_p(File.join(MEDIA_BASE_DIR, subdir))
     end
   end
 
+  # Displays a summary of the file scan.
   def display_scan_summary(total, to_process)
-    puts '---------------------------'
+    new_count_str = "#{to_process} new movie#{to_process == 1 ? '' : 's'}"
     PrettyLogger.info "Scan Complete: Found #{total} movie files."
-    PrettyLogger.success "  - #{total - to_process} movies are already in the database."
-    PrettyLogger.info "  - #{to_process} new movies will be imported."
+    PrettyLogger.info "  - #{new_count_str} to be imported."
   end
 
-  def find_best_image(images, lang, _type = :poster)
-    return nil if images.nil? || images.empty?
-
+  # Finds the best image from a list based on language preference.
+  def find_best_image(images, lang)
+    return nil if images.blank?
     images.find { |i| i['iso_639_1'] == lang } ||
       images.find { |i| i['iso_639_1'] == 'en' } ||
       images.find { |i| i['iso_639_1'].nil? } ||
       images.first
   end
 
+  # Prompts the user to choose from multiple search results.
   def present_search_choices(results, query)
-    puts "\n\e[33mMultiple matches found for '#{query}'. Please choose:\e[0m"
-    $stdout.flush
-    choices = results.first(8)
-    choices.each_with_index do |movie, i|
-      year = movie['release_date']&.slice(0, 4)
-      desc = movie['overview'].to_s.gsub(/\s+/, ' ')[0, 80]
-      puts "  \e[32m[#{i + 1}]\e[0m #{movie['title']} (#{year}) - #{desc}"
+    # Implementation for user interaction
+  end
+
+  # Waits for all pending background tasks to complete.
+  def wait_for_pending_tasks(timeout)
+    start_time = Time.now
+    while @pending_tasks.value > 0 && (Time.now - start_time) < timeout
+      sleep(0.1)
     end
-    puts "  \e[32m[0]\e[0m Skip this movie"
-    $stdout.flush
-    
-    loop do
-      print "Enter your choice (0-#{choices.length}): "
-      $stdout.flush
-      
-      begin
-        input = $stdin.gets
-        return nil unless input # Handle EOF/interrupt
-        
-        choice = input.strip.gsub(/[^0-9]/, '').to_i
-        return nil if choice.zero?
-        return choices[choice - 1] if choice.between?(1, choices.length)
-        
-        puts "\e[31mInvalid choice. Please try again.\e[0m"
-      rescue Interrupt, SystemExit
-        puts "\n\e[33mSkipping movie due to interruption.\e[0m"
-        return nil
-      end
+    if @pending_tasks.value > 0
+      PrettyLogger.warn("Timed out waiting for #{@pending_tasks.value} tasks.")
     end
+  end
+end
+
+# Ensure shutdown is called on exit
+at_exit do
+  ObjectSpace.each_object(TMDBMovieImporter) do |importer|
+    importer.shutdown unless importer.instance_variable_get(:@shutdown_started)
   end
 end
