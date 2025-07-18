@@ -80,6 +80,8 @@ class DatabaseService
     genre_names = (details['genres'] || []).map { |g| g['name'] }
     genre_ids = get_or_create_generic_bulk('genres', 'genre_name', 'genre_id', genre_names)
     link_generic_bulk('series_genres', 'series_id', 'genre_id', series_id, genre_ids)
+
+    people_map
   end
 
   def insert_movie_file(movie_id, file_path, mediainfo)
@@ -128,6 +130,8 @@ class DatabaseService
     lang_data = (details['spoken_languages'] || []).map { |l| [l['iso_639_1'], l['english_name']] }
     lang_ids = get_or_create_code_name_bulk('languages', 'iso_639_1_code', 'language_name', 'language_id', lang_data)
     link_generic_bulk('movie_languages', 'movie_id', 'language_id', movie_id, lang_ids)
+
+    people_map
   end
 
   def update_record(table:, id_col:, id_val:, data:)
@@ -148,7 +152,7 @@ class DatabaseService
 
     sql = <<~SQL
       WITH new_names (name) AS (
-        SELECT * FROM unnest($1::text[])
+        SELECT * FROM unnest(?::text[])
       ),
       ins AS (
         INSERT INTO #{table} (#{name_col})
@@ -158,9 +162,10 @@ class DatabaseService
       )
       SELECT #{id_col}, #{name_col} FROM ins
       UNION ALL
-      SELECT #{id_col}, #{name_col} FROM #{table} WHERE #{name_col} = ANY($1)
+      SELECT #{id_col}, #{name_col} FROM #{table} WHERE #{name_col} = ANY(?)
     SQL
-    DB[sql, Sequel.pg_array(names)].map { |r| r[id_col.to_sym] }
+    array = Sequel.pg_array(names)
+    DB[sql, array, array].map { |r| r[id_col.to_sym] }
   end
 
   def get_or_create_code_name_bulk(table, code_col, name_col, id_col, data)
@@ -169,7 +174,7 @@ class DatabaseService
     codes = data.map(&:first)
     sql = <<~SQL
       WITH new_items (code, name) AS (
-        SELECT * FROM unnest($1::text[], $2::text[])
+        SELECT * FROM unnest(?::text[], ?::text[])
       ),
       ins AS (
         INSERT INTO #{table} (#{code_col}, #{name_col})
@@ -179,9 +184,11 @@ class DatabaseService
       )
       SELECT #{id_col}, #{code_col} FROM ins
       UNION ALL
-      SELECT #{id_col}, #{code_col} FROM #{table} WHERE #{code_col} = ANY($1)
+      SELECT #{id_col}, #{code_col} FROM #{table} WHERE #{code_col} = ANY(?)
     SQL
-    DB[sql, Sequel.pg_array(codes), Sequel.pg_array(data.map(&:last))].map { |r| r[id_col.to_sym] }
+    codes_array = Sequel.pg_array(codes)
+    names_array = Sequel.pg_array(data.map(&:last))
+    DB[sql, codes_array, names_array, codes_array].map { |r| r[id_col.to_sym] }
   end
 
   def get_or_create_people_bulk(people)
@@ -190,7 +197,7 @@ class DatabaseService
     tmdb_ids = people.map { |p| p['id'] }
     sql = <<~SQL
       WITH new_people (tmdb_id, full_name) AS (
-        SELECT * FROM unnest($1::int[], $2::text[])
+        SELECT * FROM unnest(?::int[], ?::text[])
       ),
       ins AS (
         INSERT INTO people (tmdb_id, full_name)
@@ -200,9 +207,11 @@ class DatabaseService
       )
       SELECT person_id, tmdb_id FROM ins
       UNION ALL
-      SELECT person_id, tmdb_id FROM people WHERE tmdb_id = ANY($1)
+      SELECT person_id, tmdb_id FROM people WHERE tmdb_id = ANY(?)
     SQL
-    DB[sql, Sequel.pg_array(tmdb_ids), Sequel.pg_array(people.map { |p| p['name'] })]
+    ids_array = Sequel.pg_array(tmdb_ids)
+    names_array = Sequel.pg_array(people.map { |p| p['name'] })
+    DB[sql, ids_array, names_array, ids_array]
       .each_with_object({}) { |r, h| h[r[:tmdb_id].to_i] = r[:person_id].to_i }
   end
 

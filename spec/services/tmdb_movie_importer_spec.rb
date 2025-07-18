@@ -19,7 +19,7 @@ RSpec.describe TMDBMovieImporter do
     allow(@db_service).to receive(:conn).and_return(db)
     allow(@db_service).to receive(:get_existing_file_paths).and_return(Set.new)
     allow(@db_service).to receive(:insert_movie).and_return(1)
-    allow(@db_service).to receive(:bulk_import_associations)
+    allow(@db_service).to receive(:bulk_import_associations).and_return({})
     allow(@db_service).to receive(:insert_movie_file).and_return(1)
     allow(@db_service).to receive(:update_record)
     allow(@db_service).to receive(:close)
@@ -195,6 +195,7 @@ RSpec.describe TMDBMovieImporter do
       allow(importer).to receive(:fetch_movie_details).and_return(movie_details)
       allow(importer).to receive(:process_technical_data)
       allow(importer).to receive(:enqueue_image_downloads)
+      allow(importer).to receive(:enqueue_person_image_downloads)
     end
 
     it 'updates TUI with filename' do
@@ -205,9 +206,10 @@ RSpec.describe TMDBMovieImporter do
     context 'with successful import flow' do
       it 'executes complete import process' do
         expect(@db_service).to receive(:insert_movie).with(movie_details).and_return(1)
-        expect(@db_service).to receive(:bulk_import_associations).with(1, movie_details)
+        expect(@db_service).to receive(:bulk_import_associations).with(1, movie_details).and_return({})
         expect(importer).to receive(:process_technical_data).with(1, movie_file)
         expect(importer).to receive(:enqueue_image_downloads).with(1, movie_details)
+        expect(importer).to receive(:enqueue_person_image_downloads).with(movie_details, {})
         
         importer.send(:process_movie_file, movie_file)
       end
@@ -753,8 +755,8 @@ RSpec.describe TMDBMovieImporter do
     end
 
     it 'displays release year correctly' do
-      expect($stdout).to receive(:puts).with(/Movie 1 \(2020\)/)
-      expect($stdout).to receive(:puts).with(/Movie 3 \(\)/) # nil date
+      expect($stdout).to receive(:puts).with(/Movie 1 \(2020\) -/)
+      expect($stdout).to receive(:puts).with(/Movie 3 \(\) -/) # nil date
       
       allow($stdin).to receive(:gets).and_return("1\n")
       
@@ -768,7 +770,9 @@ RSpec.describe TMDBMovieImporter do
         .with(File.join(TMDBMovieImporter::MEDIA_BASE_DIR, 'movies'))
       expect(FileUtils).to receive(:mkdir_p)
         .with(File.join(TMDBMovieImporter::MEDIA_BASE_DIR, 'people'))
-      
+      expect(FileUtils).to receive(:mkdir_p)
+        .with(File.join(TMDBMovieImporter::MEDIA_BASE_DIR, 'series'))
+
       importer.send(:setup_media_directories)
     end
   end

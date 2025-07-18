@@ -75,9 +75,10 @@ class TMDBMovieImporter
     end
     @db_service.conn.transaction do
       movie_id = @db_service.insert_movie(details)
-      @db_service.bulk_import_associations(movie_id, details)
+      people_map = @db_service.bulk_import_associations(movie_id, details)
       process_technical_data(movie_id, file_path)
       enqueue_image_downloads(movie_id, details)
+      enqueue_person_image_downloads(details, people_map)
     end
   rescue StandardError => e
     PrettyLogger.error("Fatal error processing '#{filename}': #{e.message}")
@@ -129,6 +130,17 @@ class TMDBMovieImporter
     enqueue_download(:movies, :logo_path, movie_id, logo&.dig('file_path'), "movies/#{movie_id}/logo.png")
   end
 
+  def enqueue_person_image_downloads(details, people_map)
+    cast = details.dig('credits', 'cast') || []
+    crew = details.dig('credits', 'crew') || []
+    (cast + crew).uniq { |p| p['id'] }.each do |person|
+      person_id = people_map[person['id']]
+      next unless person_id && person['profile_path']
+
+      enqueue_download(:people, :headshot_path, person_id, person['profile_path'], "people/#{person_id}/headshot.jpg")
+    end
+  end
+
   def enqueue_download(table, column, id, api_path, save_path)
     return unless api_path
 
@@ -169,7 +181,9 @@ class TMDBMovieImporter
   end
 
   def setup_media_directories
-    %w[movies people].each { |subdir| FileUtils.mkdir_p(File.join(MEDIA_BASE_DIR, subdir)) }
+    %w[movies people series].each do |subdir|
+      FileUtils.mkdir_p(File.join(MEDIA_BASE_DIR, subdir))
+    end
   end
 
   def display_scan_summary(total, to_process)
@@ -193,7 +207,9 @@ class TMDBMovieImporter
     puts "\n\e[33mMultiple matches found for '#{query}'. Please choose:\e[0m"
     choices = results.first(8)
     choices.each_with_index do |movie, i|
-      puts "  \e[32m[#{i + 1}]\e[0m #{movie['title']} (#{movie['release_date']&.slice(0, 4)})"
+      year = movie['release_date']&.slice(0, 4)
+      desc = movie['overview'].to_s.gsub(/\s+/, ' ')[0, 80]
+      puts "  \e[32m[#{i + 1}]\e[0m #{movie['title']} (#{year}) - #{desc}"
     end
     puts "  \e[32m[0]\e[0m Skip this movie"
     loop do
