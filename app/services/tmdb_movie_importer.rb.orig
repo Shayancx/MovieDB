@@ -262,7 +262,6 @@ class TMDBMovieImporter
 
   def present_search_choices(results, query)
     puts "\n\e[33mMultiple matches found for '#{query}'. Please choose:\e[0m"
-    $stdout.flush
     choices = results.first(8)
     choices.each_with_index do |movie, i|
       year = movie['release_date']&.slice(0, 4)
@@ -270,7 +269,6 @@ class TMDBMovieImporter
       puts "  \e[32m[#{i + 1}]\e[0m #{movie['title']} (#{year}) - #{desc}"
     end
     puts "  \e[32m[0]\e[0m Skip this movie"
-    $stdout.flush
     
     loop do
       print "Enter your choice (0-#{choices.length}): "

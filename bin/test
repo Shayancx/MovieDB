@@ -1,0 +1,20 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# Test runner with proper thread cleanup
+require 'timeout'
+
+puts "Running RSpec tests with thread safety..."
+
+begin
+  Timeout.timeout(300) do # 5 minute timeout
+    system("bundle exec rspec --format progress")
+  end
+rescue Timeout::Error
+  puts "\n\nTests timed out after 5 minutes!"
+  
+  # Kill any hanging processes
+  `ps aux | grep rspec | grep -v grep | awk '{print $2}' | xargs -r kill -9`
+  
+  exit 1
+end

@@ -13,7 +13,10 @@ begin
     port: db_config&.[]('port') || ENV['DB_PORT'] || 5432,
     database: db_config&.[]('dbname') || ENV['DB_NAME'] || 'MovieDB',
     user: db_config&.[]('user') || ENV['DB_USER'] || 'shayan',
-    password: db_config&.[]('password') || ENV['DB_PASSWORD'] || ''
+    password: db_config&.[]('password') || ENV['DB_PASSWORD'] || '',
+    connect_timeout: 10,
+    command_timeout: 30,
+    pool_timeout: 10
   )
   DB.extension :pg_array
   DB.test_connection

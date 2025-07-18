@@ -46,18 +46,37 @@ class TmdbClient
 
     source_url = "#{TMDB_IMAGE_BASE_URL}#{api_path}"
     absolute_save_path = File.join(MEDIA_BASE_DIR, relative_save_path)
-    return relative_save_path if File.exist?(absolute_save_path)
+    
+    # Check if file already exists
+    if File.exist?(absolute_save_path)
+      PrettyLogger.debug("Image already exists: #{relative_save_path}")
+      return relative_save_path
+    end
 
+    PrettyLogger.info("Downloading image: #{api_path} -> #{relative_save_path}")
+    
+    # Ensure directory exists
     FileUtils.mkdir_p(File.dirname(absolute_save_path))
+    
+    # Check directory is writable
+    unless File.writable?(File.dirname(absolute_save_path))
+      PrettyLogger.error("Directory not writable: #{File.dirname(absolute_save_path)}")
+      return nil
+    end
+    
     retry_with_backoff do
       URI.open(source_url) do |image|
-        File.open(absolute_save_path, 'wb') { |file| file.write(image.read) }
+        File.open(absolute_save_path, 'wb') do |file|
+          file.write(image.read)
+        end
       end
     end
-    PrettyLogger.debug("Downloaded image to #{relative_save_path}")
+    
+    PrettyLogger.success("Downloaded image to #{relative_save_path}")
     relative_save_path
   rescue StandardError => e
-    PrettyLogger.warn("Failed to download image from #{source_url}: #{e.message}")
+    PrettyLogger.error("Failed to download image from #{source_url}: #{e.message}")
+    PrettyLogger.debug(e.backtrace.join("\n")) if ENV['DEBUG']
     nil
   end
 
@@ -67,8 +86,12 @@ class TmdbClient
     params[:api_key] = TMDB_API_KEY
     uri = URI("#{TMDB_API_BASE_URL}#{path}")
     uri.query = URI.encode_www_form(params)
+    
+    PrettyLogger.debug("API Request: #{uri}")
+    
     request = Net::HTTP::Get.new(uri)
     response = @http.request(request)
+    
     case response
     when Net::HTTPSuccess
       JSON.parse(response.body)
@@ -78,7 +101,7 @@ class TmdbClient
       sleep(retry_after)
       make_api_request(path, params)
     else
-      PrettyLogger.warn("API request failed for '#{path}': #{response.code} #{response.message}")
+      PrettyLogger.error("API request failed for '#{path}': #{response.code} #{response.message}")
       nil
     end
   rescue Net::OpenTimeout, Net::ReadTimeout, Errno::ECONNRESET => e
@@ -93,13 +116,18 @@ class TmdbClient
   end
 
   def retry_with_backoff(times = 3)
-    yield
-  rescue Net::OpenTimeout, Net::ReadTimeout, Errno::ECONNRESET, OpenURI::HTTPError => e
-    if (times -= 1).positive?
-      sleep(3 - times)
-      retry
-    else
-      raise e
+    attempt = 0
+    begin
+      attempt += 1
+      yield
+    rescue Net::OpenTimeout, Net::ReadTimeout, Errno::ECONNRESET, OpenURI::HTTPError => e
+      if attempt < times
+        PrettyLogger.debug("Retry attempt #{attempt} after error: #{e.message}")
+        sleep(attempt)
+        retry
+      else
+        raise e
+      end
     end
   end
 end

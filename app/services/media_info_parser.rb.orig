@@ -9,17 +9,7 @@ class MediaInfoParser
               :frame_rate, :aspect_ratio
 
   def initialize(file_path)
-    unless system('which mediainfo >/dev/null 2>&1')
-      PrettyLogger.warn("mediainfo command not found. Please install it.")
-      @data = nil
-      @media = nil
-      return
-    end
-    
-    json_output = `mediainfo --Output=JSON -f "#{file_path}" 2>/dev/null`
-    unless $CHILD_STATUS.success?
-      json_output = `mediainfo --Output=JSON "#{file_path}" 2>/dev/null`
-    end
+    json_output = `mediainfo --Output=JSON -f "#{file_path}"`
     @data = $CHILD_STATUS.success? ? JSON.parse(json_output) : nil
     @media = @data ? @data['media'] : nil
     parse

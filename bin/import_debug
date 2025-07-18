@@ -1,6 +1,9 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 
+ENV['DEBUG'] = '1'  # Enable debug logging
+ENV['RUBYOPT'] = '-W0'  # Suppress warnings
+
 require_relative '../app/services/tmdb_movie_importer'
 require_relative '../app/services/tmdb_series_importer'
 require_relative '../app/services/pretty_logger'
@@ -11,32 +14,33 @@ include ImportConfig
 if __FILE__ == $PROGRAM_NAME
   unless system('command -v mediainfo > /dev/null 2>&1')
     PrettyLogger.error("'mediainfo' command-line tool not found. Please install it first.")
-    PrettyLogger.info("On Ubuntu/Debian: sudo apt-get install mediainfo")
-    PrettyLogger.info("On macOS: brew install mediainfo")
-    PrettyLogger.info("On Arch: sudo pacman -S mediainfo")
     exit 1
   end
 
-  if ARGV[0] == '--series'
-    series_directory = ARGV[1]
-    unless series_directory && File.directory?(series_directory)
-      puts "Usage: #{$PROGRAM_NAME} --series [path_to_series_directory]"
-      exit 1
-    end
-    importer = TMDBSeriesImporter.new
-    label = 'TMDB Series Importer'
-    target_dir = series_directory
-  else
-    movie_directory = ARGV[0]
-    unless movie_directory && File.directory?(movie_directory)
-      puts "Usage: #{$PROGRAM_NAME} [path_to_movie_directory]"
-      exit 1
-    end
-    importer = TMDBMovieImporter.new
-    label = 'TMDB Movie Importer'
-    target_dir = movie_directory
+  # Check TMDB API key
+  unless ENV['TMDB_API_KEY'] && !ENV['TMDB_API_KEY'].empty?
+    PrettyLogger.error("TMDB_API_KEY environment variable not set!")
+    exit 1
+  end
+  
+  PrettyLogger.info("Using TMDB API Key: #{ENV['TMDB_API_KEY'][0..5]}...")
+
+  movie_directory = ARGV[0]
+  unless movie_directory && File.directory?(movie_directory)
+    puts "Usage: #{$PROGRAM_NAME} [path_to_movie_directory]"
+    exit 1
   end
 
+  # Check storage directory
+  storage_dir = File.expand_path('../storage/media', __dir__)
+  unless File.writable?(storage_dir)
+    PrettyLogger.error("Storage directory not writable: #{storage_dir}")
+    PrettyLogger.info("Run: chmod -R 755 #{storage_dir}")
+    exit 1
+  end
+
+  importer = TMDBMovieImporter.new
+  
   interrupted = false
   
   # Set up signal handlers
@@ -44,28 +48,30 @@ if __FILE__ == $PROGRAM_NAME
     Signal.trap(signal) do
       unless interrupted
         interrupted = true
-        puts "\n\n[\e[33mWARN\e[0m] Import interrupted by user. Shutting down gracefully..."
-        TUI.finish if TUI.active?
-        Thread.new { importer&.shutdown }
+        puts "\n\n[\e[33mWARN\e[0m] Import interrupted by user. Waiting for downloads..."
+        Thread.new { 
+          importer&.shutdown
+          exit(130)
+        }
       end
     end
   end
 
   begin
     puts "\e[36m╔════════════════════════════════════════╗\e[0m"
-    puts "\e[36m║    #{label.ljust(30)}║\e[0m"
+    puts "\e[36m║    TMDB Movie Importer (DEBUG)        ║\e[0m"
     puts "\e[36m╚════════════════════════════════════════╝\e[0m"
     puts
-    puts "Importing from:   \e[33m#{File.absolute_path(target_dir)}\e[0m"
+    puts "Importing from:   \e[33m#{File.absolute_path(movie_directory)}\e[0m"
     puts "Media storage:    \e[33m#{MEDIA_BASE_DIR}\e[0m"
     puts "Background Threads: \e[33m#{MAX_BG_THREADS}\e[0m"
+    puts "Debug Mode: \e[32mENABLED\e[0m"
+    puts
 
-    importer.import_from_directory(target_dir)
-  rescue Interrupt
-    # Already handled by signal trap
+    importer.import_from_directory(movie_directory)
   rescue StandardError => e
     PrettyLogger.error("A fatal error occurred: #{e.message}")
-    PrettyLogger.debug(e.backtrace.join("\n")) if ENV['DEBUG']
+    PrettyLogger.error(e.backtrace.join("\n"))
     TUI.finish if TUI.active?
     exit 1
   ensure
@@ -74,6 +80,4 @@ if __FILE__ == $PROGRAM_NAME
       PrettyLogger.display_summary
     end
   end
-  
-  exit(interrupted ? 130 : 0)
 end

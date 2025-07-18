@@ -188,7 +188,7 @@ RSpec.describe DatabaseService do
   describe '#update_record' do
     it 'updates record successfully' do
       expect(@dataset).to receive(:where).with(movie_id: 1).and_return(@dataset)
-      expect(@dataset).to receive(:update).with({poster_path: 'test.jpg'})
+      expect(@dataset).to receive(:update).with(poster_path: 'test.jpg')
       
       service.update_record(
         table: :movies,
@@ -298,7 +298,6 @@ RSpec.describe DatabaseService do
 
       it 'properly formats COPY data' do
         copy_conn = double('copy_connection')
-        allow(copy_conn).to receive(:copy_data).and_yield
         expect(copy_conn).to receive(:put_copy_data).twice
         allow(db).to receive(:synchronize).and_yield(copy_conn)
         
@@ -315,7 +314,6 @@ RSpec.describe DatabaseService do
       it 'skips cast without character' do
         cast_missing_char = [{ 'id' => 123, 'character' => nil, 'order' => 0 }]
         copy_conn = double('copy_connection')
-        allow(copy_conn).to receive(:copy_data).and_yield
         expect(copy_conn).not_to receive(:put_copy_data)
         allow(db).to receive(:synchronize).and_yield(copy_conn)
         

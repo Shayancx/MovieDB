@@ -15,11 +15,25 @@ ENV['RACK_ENV'] ||= 'test'
 ENV['TMDB_API_KEY'] ||= 'test_key'
 WebMock.disable_net_connect!(allow_localhost: true)
 
-# ----------------------------------------------------------------------
-# Stub the database connection before loading application code
-db_stub = double('db').as_null_object
-allow(Sequel).to receive(:connect).and_return(db_stub)
+# Ensure all threads are killed after each test
+RSpec.configure do |config|
+  config.order = :random
+  
+  config.before(:suite) do
+    # Stub the database connection before loading application code
+    db_stub = double('db').as_null_object
+    allow(Sequel).to receive(:connect).and_return(db_stub)
+  end
+  
+  config.after(:each) do
+    # Kill any lingering threads from importers
+    Thread.list.each do |thread|
+      thread.kill unless thread == Thread.current
+    end
+  end
+end
 
+# Load application files after database stub
 require_relative '../app/db'
 require_relative '../app/services/pretty_logger'
 require_relative '../app/services/database_service'
@@ -35,7 +49,3 @@ require_relative '../app/services/tui'
 require_relative '../app'
 
 Dir[File.join(__dir__, 'support', '**', '*.rb')].sort.each { |f| require f }
-
-RSpec.configure do |config|
-  config.order = :random
-end

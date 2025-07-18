@@ -8,6 +8,7 @@ require 'json'
 require_relative 'app/db'
 require_relative 'app/services/movie_service'
 require_relative 'app/services/person_service'
+require_relative 'app/services/series_service'
 require_relative 'app/services/statistics_service'
 
 class MovieExplorer < Roda

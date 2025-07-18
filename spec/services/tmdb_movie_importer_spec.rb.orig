@@ -60,13 +60,6 @@ RSpec.describe TMDBMovieImporter do
   
   after do
     FileUtils.rm_rf(test_directory)
-    # Ensure importer is shut down
-    importer.shutdown rescue nil
-    # Kill any remaining threads
-    Thread.list.each do |thread|
-      next if thread == Thread.current
-      thread.kill
-    end
   end
 
   describe '#initialize' do
