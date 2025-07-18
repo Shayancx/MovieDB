@@ -24,8 +24,21 @@ class TmdbClient
     (response && response['results']) || []
   end
 
+  def search_series(name, year)
+    response = make_api_request('/search/tv', { query: name, first_air_date_year: year }.compact)
+    (response && response['results']) || []
+  end
+
   def get_movie_details(tmdb_id)
     make_api_request("/movie/#{tmdb_id}", append_to_response: 'credits,release_dates,images')
+  end
+
+  def get_series_details(tmdb_id)
+    make_api_request("/tv/#{tmdb_id}", append_to_response: 'aggregate_credits,images,external_ids')
+  end
+
+  def get_season_details(tmdb_id, season_number)
+    make_api_request("/tv/#{tmdb_id}/season/#{season_number}")
   end
 
   def download_image(api_path, relative_save_path)

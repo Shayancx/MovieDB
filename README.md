@@ -48,6 +48,14 @@ TMDB_API_KEY=your_key bin/import /path/to/movies
 
 The importer scans the given directory, fetches metadata from TMDB and stores it in the database.
 
+### Importing series
+
+```bash
+TMDB_API_KEY=your_key bin/import --series /path/to/series
+```
+
+This uses the series importer to fetch show data and store it alongside episodes.
+
 ## Development
 
 You can modify the application routes in `app.rb` and static assets in the `public/` directory.

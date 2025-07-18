@@ -19,6 +19,7 @@ group :test do
   gem 'rspec'
   gem 'webmock'
   gem 'simplecov', require: false
+  gem 'base64'
 end
 
 # importer.rb

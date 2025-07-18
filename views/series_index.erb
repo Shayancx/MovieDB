@@ -1,0 +1,142 @@
+<div x-data="{ showFilters: false, viewMode: 'grid' }">
+  <div class="controls-section">
+    <form class="search-bar" method="get" action="/series">
+      <span class="search-icon">&gt;</span>
+      <input type="text" name="search" value="<%= request.params['search'] %>" placeholder="SEARCH_SERIES..." class="search-input">
+    </form>
+    <div class="control-buttons">
+      <button type="button" x-on:click="showFilters = !showFilters" :class="{ 'active': showFilters }" class="control-btn">
+        <span x-text="showFilters ? '[HIDE_FILTERS]' : '[SHOW_FILTERS]'"></span>
+      </button>
+      <div class="view-toggle">
+        <button type="button" x-on:click="viewMode = 'grid'" :class="{ 'active': viewMode === 'grid' }" class="view-btn">[GRID]</button>
+        <button type="button" x-on:click="viewMode = 'list'" :class="{ 'active': viewMode === 'list' }" class="view-btn">[LIST]</button>
+      </div>
+    </div>
+  </div>
+
+  <form x-show="showFilters" class="filters-panel" method="get" action="/series">
+    <div class="filters-grid">
+      <div class="filter-group">
+        <label class="filter-label">GENRE:</label>
+        <select name="genre" class="filter-select">
+          <option value="">ALL_GENRES</option>
+          <% @genres.each do |g| %>
+            <option value="<%= g[:genre_name] %>" <%= 'selected' if request.params['genre'] == g[:genre_name] %>><%= g[:genre_name] %></option>
+          <% end %>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label class="filter-label">YEAR:</label>
+        <select name="year" class="filter-select">
+          <option value="">ALL_YEARS</option>
+          <% @years.each do |y| %>
+            <option value="<%= y %>" <%= 'selected' if request.params['year'].to_s == y.to_s %>><%= y %></option>
+          <% end %>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label class="filter-label">COUNTRY:</label>
+        <select name="country" class="filter-select">
+          <option value="">ALL_COUNTRIES</option>
+          <% @countries.each do |c| %>
+            <option value="<%= c[:country_name] %>" <%= 'selected' if request.params['country'] == c[:country_name] %>><%= c[:country_name] %></option>
+          <% end %>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label class="filter-label">LANGUAGE:</label>
+        <select name="language" class="filter-select">
+          <option value="">ALL_LANGUAGES</option>
+          <% @languages.each do |l| %>
+            <option value="<%= l[:language_name] %>" <%= 'selected' if request.params['language'] == l[:language_name] %>><%= l[:language_name] %></option>
+          <% end %>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label class="filter-label">FRANCHISE:</label>
+        <select name="franchise" class="filter-select">
+          <option value="">ALL_FRANCHISES</option>
+          <% @franchises.each do |f| %>
+            <option value="<%= f[:franchise_id] %>" <%= 'selected' if request.params['franchise'] == f[:franchise_id].to_s %>><%= f[:franchise_name] %></option>
+          <% end %>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label class="filter-label">SORT_BY:</label>
+        <select name="sort_by" class="filter-select">
+          <option value="name" <%= 'selected' if request.params['sort_by'] == 'name' %>>NAME</option>
+          <option value="date" <%= 'selected' if request.params['sort_by'] == 'date' %>>RELEASE_DATE</option>
+          <option value="rating" <%= 'selected' if request.params['sort_by'] == 'rating' %>>RATING</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label class="filter-label">ORDER:</label>
+        <select name="sort_order" class="filter-select">
+          <option value="asc" <%= 'selected' if request.params['sort_order'] == 'asc' %>>ASCENDING</option>
+          <option value="desc" <%= 'selected' if request.params['sort_order'] == 'desc' %>>DESCENDING</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <button type="submit" class="clear-filters-btn">[APPLY]</button>
+      </div>
+    </div>
+  </form>
+
+  <div x-show="viewMode === 'grid'" class="movies-grid">
+    <% @series.each do |series| %>
+      <a href="/series/<%= series[:series_id] %>" class="movie-card">
+        <div class="movie-card-inner">
+          <img src="<%= image_url(series, 'poster') %>" alt="<%= series[:series_name] %>" class="movie-poster-img">
+          <div class="movie-card-overlay">
+            <div class="movie-card-info">
+              <h3 class="movie-card-title"><%= series[:series_name] %></h3>
+              <p class="movie-card-year"><%= series[:first_air_date]&.year || 'N/A' %></p>
+              <% if series[:rating] %>
+                <div class="movie-card-rating"><span><%= sprintf('%.1f', series[:rating]) %></span></div>
+              <% end %>
+            </div>
+          </div>
+        </div>
+      </a>
+    <% end %>
+  </div>
+
+  <div x-show="viewMode === 'list'" class="movies-list">
+    <div class="list-header">
+      <div class="list-col list-col-poster">POSTER</div>
+      <div class="list-col list-col-title">TITLE</div>
+      <div class="list-col list-col-year">YEAR</div>
+      <div class="list-col list-col-rating">RATING</div>
+      <div class="list-col list-col-genres">GENRES</div>
+    </div>
+    <% @series.each do |series| %>
+      <a href="/series/<%= series[:series_id] %>" class="list-item">
+        <div class="list-col list-col-poster">
+          <img src="<%= image_url(series, 'poster') %>" alt="<%= series[:series_name] %>" class="list-poster">
+        </div>
+        <div class="list-col list-col-title">
+          <span><%= series[:series_name] %></span>
+          <% if series[:original_name] %>
+            <span class="list-original-title">[<%= series[:original_name] %>]</span>
+          <% end %>
+        </div>
+        <div class="list-col list-col-year"><%= series[:first_air_date]&.year || 'N/A' %></div>
+        <div class="list-col list-col-rating">
+          <% if series[:rating] %><span><%= series[:rating] %></span><% else %>--<% end %>
+        </div>
+        <div class="list-col list-col-genres"><%= (series[:genres] || []).take(3).join(', ') %></div>
+      </a>
+    <% end %>
+  </div>
+
+  <div class="pagination">
+    <% if @page > 1 %>
+      <a href="?<%= query_with_page(@page - 1) %>" class="pagination-btn">[PREV]</a>
+    <% end %>
+    <div class="pagination-info">PAGE <%= @page %> OF <%= @total_pages %></div>
+    <% if @page < @total_pages %>
+      <a href="?<%= query_with_page(@page + 1) %>" class="pagination-btn">[NEXT]</a>
+    <% end %>
+  </div>
+</div>

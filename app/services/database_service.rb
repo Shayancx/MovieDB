@@ -42,6 +42,46 @@ class DatabaseService
        franchise_id].get(:movie_id).to_i
   end
 
+  def insert_series(details)
+    franchise_id = get_or_create_franchise(details['belongs_to_collection'])
+    sql = <<~SQL
+      INSERT INTO series (series_name, original_name, first_air_date, last_air_date, status, description, imdb_id, tmdb_id, franchise_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT (tmdb_id) DO UPDATE SET
+        series_name = EXCLUDED.series_name,
+        original_name = EXCLUDED.original_name,
+        first_air_date = EXCLUDED.first_air_date,
+        last_air_date = EXCLUDED.last_air_date,
+        status = EXCLUDED.status,
+        description = EXCLUDED.description,
+        imdb_id = EXCLUDED.imdb_id
+      RETURNING series_id
+    SQL
+    DB[sql,
+       details['name'],
+       details['original_name'],
+       details['first_air_date'],
+       details['last_air_date'],
+       details['status'],
+       details['overview'],
+       details.dig('external_ids', 'imdb_id'),
+       details['id'],
+       franchise_id].get(:series_id).to_i
+  end
+
+  def bulk_import_series_associations(series_id, details)
+    cast_data = (details.dig('aggregate_credits', 'cast') || []).first(50)
+    crew_data = details.dig('aggregate_credits', 'crew') || []
+    people_data = (cast_data + crew_data).uniq { |p| p['id'] }
+    people_map = get_or_create_people_bulk(people_data)
+    link_series_cast_bulk(series_id, cast_data, people_map)
+    link_series_crew_bulk(series_id, crew_data, people_map)
+
+    genre_names = (details['genres'] || []).map { |g| g['name'] }
+    genre_ids = get_or_create_generic_bulk('genres', 'genre_name', 'genre_id', genre_names)
+    link_generic_bulk('series_genres', 'series_id', 'genre_id', series_id, genre_ids)
+  end
+
   def insert_movie_file(movie_id, file_path, mediainfo)
     resolution_id = get_or_create_resolution(mediainfo.width, mediainfo.height)
     video_codec_id = get_or_create_generic('video_codecs', 'codec_name', 'codec_id', mediainfo.video_codec)
@@ -205,6 +245,30 @@ class DatabaseService
     writer_ids = writers.map { |w| people_map[w['id']] }.compact
     link_generic_bulk('movie_directors', 'movie_id', 'person_id', movie_id, director_ids)
     link_generic_bulk('movie_writers', 'movie_id', 'person_id', movie_id, writer_ids)
+  end
+
+  def link_series_cast_bulk(series_id, cast_data, people_map)
+    return if cast_data.empty?
+
+    DB.synchronize do |c|
+      c.copy_data 'COPY series_cast (series_id, person_id, character_name, billing_order) FROM STDIN' do
+        cast_data.each do |member|
+          person_id = people_map[member['id']]
+          next unless person_id && member['character']
+
+          row = [series_id, person_id, member['character'], member['order'] + 1].join("\t")
+          c.put_copy_data "#{row}\n"
+        end
+      end
+    end
+  rescue PG::UniqueViolation
+    PrettyLogger.debug("Cast for series ##{series_id} already linked.")
+  end
+
+  def link_series_crew_bulk(series_id, crew_data, people_map)
+    creators = crew_data.select { |c| c['job'] == 'Creator' }
+    creator_ids = creators.map { |c| people_map[c['id']] }.compact
+    link_generic_bulk('series_creators', 'series_id', 'person_id', series_id, creator_ids)
   end
 
   def get_or_create_franchise(collection_data)

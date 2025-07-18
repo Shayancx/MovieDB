@@ -83,7 +83,9 @@ class MovieExplorer < Roda
     end
 
     r.root do
-      r.redirect '/movies'
+      @recent_movies = MovieService.recent(10)
+      @recent_series = SeriesService.recent(10)
+      view('home')
     end
 
     r.get 'movies' do
@@ -113,10 +115,43 @@ class MovieExplorer < Roda
       view('index')
     end
 
+    r.get 'series' do
+      filters = {
+        search: r.params['search'],
+        genre: r.params['genre'],
+        country: r.params['country'],
+        language: r.params['language'],
+        franchise: r.params['franchise'],
+        year: r.params['year'],
+        sort_by: r.params['sort_by'],
+        sort_order: r.params['sort_order']
+      }
+      all_series = SeriesService.filtered(filters)
+      @total = all_series.size
+      @page = (r.params['page'] || '1').to_i
+      @movies_per_page = 24
+      @series = all_series.slice((@page - 1) * @movies_per_page, @movies_per_page) || []
+      @total_pages = (@total / @movies_per_page.to_f).ceil
+
+      @genres = MovieService.genres
+      @countries = MovieService.countries
+      @languages = MovieService.languages
+      @franchises = MovieService.franchises
+      @years = MovieService.years
+
+      view('series_index')
+    end
+
     r.get 'movie', Integer do |movie_id|
       @movie = MovieService.find(movie_id)
       r.halt(404, 'Movie not found') unless @movie
       view('movie')
+    end
+
+    r.get 'series', Integer do |series_id|
+      @series = SeriesService.find(series_id)
+      r.halt(404, 'Series not found') unless @series
+      view('series')
     end
 
     r.get 'statistics' do
@@ -131,10 +166,20 @@ class MovieExplorer < Roda
         MovieService.filtered(r.params)
       end
 
+      r.get 'series' do
+        SeriesService.filtered(r.params)
+      end
+
       r.get 'movie', Integer do |movie_id|
         movie = MovieService.find(movie_id)
         r.halt(404, { error: 'Movie not found' }) unless movie
         movie
+      end
+
+      r.get 'series', Integer do |series_id|
+        series = SeriesService.find(series_id)
+        r.halt(404, { error: 'Series not found' }) unless series
+        series
       end
 
       r.get 'genres' do

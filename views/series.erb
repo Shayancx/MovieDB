@@ -1,0 +1,75 @@
+<div class="series-page" x-data="{ activeTab: 'general' }">
+  <div class="tab-navigation">
+    <button @click="activeTab = 'general'" :class="{ 'active': activeTab === 'general' }" class="tab-button">
+      <span class="tab-number">01</span>
+      <span class="tab-label">GENERAL</span>
+    </button>
+    <button @click="activeTab = 'seasons'" :class="{ 'active': activeTab === 'seasons' }" class="tab-button">
+      <span class="tab-number">02</span>
+      <span class="tab-label">SEASONS</span>
+    </button>
+  </div>
+
+  <div class="tab-content">
+    <div x-show="activeTab === 'general'" class="tab-panel">
+      <div class="movie-layout">
+        <div class="movie-poster">
+          <img src="<%= image_url(@series, 'poster') %>" alt="<%= @series[:series_name] %>">
+        </div>
+        <div class="movie-info">
+          <div class="info-section-box">
+            <h3 class="section-title">>> DESCRIPTION</h3>
+            <p class="description"><%= @series[:description] || 'No description available.' %></p>
+          </div>
+          <div class="details-grid">
+            <div class="detail-item">
+              <span class="detail-label">FIRST_AIR:</span>
+              <span class="detail-value"><%= format_date(@series[:first_air_date]) %></span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">LAST_AIR:</span>
+              <span class="detail-value"><%= format_date(@series[:last_air_date]) %></span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">STATUS:</span>
+              <span class="detail-value"><%= @series[:status] %></span>
+            </div>
+          </div>
+          <% if @series[:genres]&.any? %>
+          <div class="info-section">
+            <h3 class="section-title">>> GENRES</h3>
+            <div class="tag-list">
+              <% @series[:genres].each do |genre| %>
+                <span class="tag"><%= genre %></span>
+              <% end %>
+            </div>
+          </div>
+          <% end %>
+        </div>
+      </div>
+    </div>
+
+    <div x-show="activeTab === 'seasons'" class="tab-panel">
+      <% (@series[:seasons] || []).each do |season| %>
+      <div class="season-block">
+        <h3 class="season-title">Season <%= season[:season_number] %> - <%= season[:season_name] %></h3>
+        <div class="episodes-grid">
+          <% (season[:episodes] || []).each do |ep| %>
+          <div class="episode-card">
+            <div class="episode-thumb">
+              <img src="<%= image_url(ep, 'backdrop') %>" alt="Episode still">
+            </div>
+            <div class="episode-info">
+              <div class="episode-title">E<%= ep[:episode_number] %> - <%= ep[:episode_name] %></div>
+              <div class="episode-date"><%= format_date(ep[:air_date]) %></div>
+            </div>
+          </div>
+          <% end %>
+        </div>
+      </div>
+      <% end %>
+    </div>
+  </div>
+
+  <p><a href="/series">[BACK_TO_LIST]</a></p>
+</div>

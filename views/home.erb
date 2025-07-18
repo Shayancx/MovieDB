@@ -1,0 +1,22 @@
+<div class="home-page">
+  <section class="carousel-section">
+    <h2 class="carousel-title">Recently added Movies</h2>
+    <div class="carousel">
+      <% (@recent_movies || []).each do |movie| %>
+        <a href="/movie/<%= movie[:movie_id] %>" class="carousel-item">
+          <img src="<%= image_url(movie, 'poster') %>" alt="<%= movie[:movie_name] %>" class="carousel-img">
+        </a>
+      <% end %>
+    </div>
+  </section>
+  <section class="carousel-section">
+    <h2 class="carousel-title">Recently added Series</h2>
+    <div class="carousel">
+      <% (@recent_series || []).each do |series| %>
+        <a href="/series/<%= series[:series_id] %>" class="carousel-item">
+          <img src="<%= image_url(series, 'poster') %>" alt="<%= series[:series_name] %>" class="carousel-img">
+        </a>
+      <% end %>
+    </div>
+  </section>
+</div>

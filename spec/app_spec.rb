@@ -33,10 +33,15 @@ RSpec.describe MovieExplorer do
 
   describe 'Route Testing' do
     describe 'GET /' do
-      it 'redirects to /movies' do
+      before do
+        allow(MovieService).to receive(:recent).and_return([])
+        allow(SeriesService).to receive(:recent).and_return([])
+      end
+
+      it 'renders home page' do
         get '/'
-        expect(last_response).to be_redirect
-        expect(last_response.location).to end_with('/movies')
+        expect(last_response).to be_ok
+        expect(last_response.body).to include('Recently added Movies')
       end
     end
 

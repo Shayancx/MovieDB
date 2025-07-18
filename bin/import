@@ -2,6 +2,7 @@
 # frozen_string_literal: true
 
 require_relative '../app/services/tmdb_movie_importer'
+require_relative '../app/services/tmdb_series_importer'
 require_relative '../app/services/pretty_logger'
 require_relative '../app/services/import_config'
 require_relative '../app/services/tui'
@@ -13,24 +14,37 @@ if __FILE__ == $PROGRAM_NAME
     exit 1
   end
 
-  movie_directory = ARGV[0]
-  unless movie_directory && File.directory?(movie_directory)
-    puts "Usage: #{$PROGRAM_NAME} [path_to_movie_directory]"
-    exit 1
+  if ARGV[0] == '--series'
+    series_directory = ARGV[1]
+    unless series_directory && File.directory?(series_directory)
+      puts "Usage: #{$PROGRAM_NAME} --series [path_to_series_directory]"
+      exit 1
+    end
+    importer = TMDBSeriesImporter.new
+    label = 'TMDB Series Importer'
+    target_dir = series_directory
+  else
+    movie_directory = ARGV[0]
+    unless movie_directory && File.directory?(movie_directory)
+      puts "Usage: #{$PROGRAM_NAME} [path_to_movie_directory]"
+      exit 1
+    end
+    importer = TMDBMovieImporter.new
+    label = 'TMDB Movie Importer'
+    target_dir = movie_directory
   end
 
   importer = nil
   begin
     puts "\e[36m╔════════════════════════════════════════╗\e[0m"
-    puts "\e[36m║    TMDB Movie Importer               ║\e[0m"
+    puts "\e[36m║    #{label.ljust(30)}║\e[0m"
     puts "\e[36m╚════════════════════════════════════════╝\e[0m"
     puts
-    puts "Importing from:   \e[33m#{File.absolute_path(movie_directory)}\e[0m"
+    puts "Importing from:   \e[33m#{File.absolute_path(target_dir)}\e[0m"
     puts "Media storage:    \e[33m#{MEDIA_BASE_DIR}\e[0m"
     puts "Background Threads: \e[33m#{MAX_BG_THREADS}\e[0m"
 
-    importer = TMDBMovieImporter.new
-    importer.import_from_directory(movie_directory)
+    importer.import_from_directory(target_dir)
   rescue Interrupt
     puts "\n\n[\e[33mWARN\e[0m] Import interrupted by user. Shutting down gracefully..."
     TUI.finish if TUI.active?

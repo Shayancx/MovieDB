@@ -183,5 +183,8 @@ class MovieService
         .order(Sequel.desc(:year))
         .map { |r| r[:year].to_i }
     end
+    def recent(limit = 10)
+      DB[:movies].order(Sequel.desc(:created_at)).limit(limit).all
+    end
   end
 end
